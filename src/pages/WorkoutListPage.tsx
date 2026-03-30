@@ -66,7 +66,7 @@ export default function WorkoutListPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <div className="flex items-center justify-between px-4 pt-14 pb-4">
+      <div className="flex items-center justify-between px-4 pt-4 pb-4">
         <h1 className="text-2xl font-bold">Treninzi</h1>
         <div className="flex items-center gap-2">
           <button className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400" onClick={() => navigate('/log')}>

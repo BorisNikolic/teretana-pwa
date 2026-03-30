@@ -44,7 +44,7 @@ export default function ProgressReportPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <div className="flex items-center gap-3 px-4 pt-14 pb-4">
+      <div className="flex items-center gap-3 px-4 pt-4 pb-4">
         <button className="text-blue-400 p-1 -ml-1" onClick={() => navigate('/')}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
