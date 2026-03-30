@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Exercise, CardioLog } from '../types'
-import { getExercises, getVideo, saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog } from '../db'
+import { getExercises, getVideo, saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording } from '../db'
 import { useRestTimer } from '../hooks/useRestTimer'
 import InfoCard from '../components/InfoCard'
 import ExerciseHistory from '../components/ExerciseHistory'
@@ -26,6 +26,10 @@ export default function ExerciseDetailPage() {
   const [cardioSaved, setCardioSaved] = useState(false)
   const [lastCardio, setLastCardio] = useState<CardioLog | null>(null)
 
+  // Recording state
+  const [recSrc, setRecSrc] = useState<string | null>(null)
+  const [recBlob, setRecBlob] = useState<Blob | null>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
@@ -34,7 +38,16 @@ export default function ExerciseDetailPage() {
     getVideo(exerciseId).then(blob => { if (blob) setVideoSrc(URL.createObjectURL(blob)) })
     getLastSessionWeights(exerciseId).then(setLastWeights)
     getLastCardioLog(exerciseId).then(setLastCardio)
-    return () => { if (videoSrc) URL.revokeObjectURL(videoSrc) }
+    getTodayRecording(exerciseId).then(rec => {
+      if (rec) {
+        setRecBlob(rec.blob)
+        setRecSrc(URL.createObjectURL(rec.blob))
+      }
+    })
+    return () => {
+      if (videoSrc) URL.revokeObjectURL(videoSrc)
+      if (recSrc) URL.revokeObjectURL(recSrc)
+    }
   }, [exerciseId])
 
   const isCardio = (exercise?.type ?? 'strength') === 'cardio'
@@ -62,6 +75,35 @@ export default function ExerciseDetailPage() {
     setCardioSaved(true)
   }
 
+  const handleRecord = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await saveRecording(exerciseId!, file)
+    setRecBlob(file)
+    if (recSrc) URL.revokeObjectURL(recSrc)
+    setRecSrc(URL.createObjectURL(file))
+  }
+
+  const handleShareRecording = async () => {
+    if (!recBlob || !exercise) return
+    const file = new File([recBlob], `${exercise.name}.mp4`, { type: recBlob.type || 'video/mp4' })
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: exercise.name })
+        return
+      }
+    } catch { /* user cancelled or share failed */ }
+    // Fallback: download to Files/Photos
+    const url = URL.createObjectURL(recBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${exercise.name}.mp4`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   if (!exercise) return null
 
   return (
@@ -81,7 +123,7 @@ export default function ExerciseDetailPage() {
         </button>
       </div>
 
-      {/* Video */}
+      {/* Trainer video */}
       {videoSrc ? (
         <video ref={videoRef} src={videoSrc} controls playsInline className="w-full aspect-video bg-black" />
       ) : (
@@ -94,7 +136,6 @@ export default function ExerciseDetailPage() {
 
       <div className="px-4 mt-4 space-y-4">
         {isCardio ? (
-          /* ---- CARDIO ---- */
           <>
             <div className="flex gap-3">
               <InfoCard title="Tip" value="Kardio" />
@@ -108,46 +149,24 @@ export default function ExerciseDetailPage() {
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <input
-                  type="number" inputMode="numeric"
-                  className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder={lastCardio ? `${Math.round(lastCardio.duration / 60)}` : '0'}
-                  value={cardioDuration}
-                  onChange={e => { setCardioDuration(e.target.value); setCardioSaved(false) }}
-                />
+                <input type="number" inputMode="numeric" className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500" placeholder={lastCardio ? `${Math.round(lastCardio.duration / 60)}` : '0'} value={cardioDuration} onChange={e => { setCardioDuration(e.target.value); setCardioSaved(false) }} />
                 <span className="text-sm text-gray-400 w-8">min</span>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number" inputMode="decimal"
-                  className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder={lastCardio ? `${lastCardio.speed}` : '0'}
-                  value={cardioSpeed}
-                  onChange={e => { setCardioSpeed(e.target.value); setCardioSaved(false) }}
-                />
+                <input type="number" inputMode="decimal" className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500" placeholder={lastCardio ? `${lastCardio.speed}` : '0'} value={cardioSpeed} onChange={e => { setCardioSpeed(e.target.value); setCardioSaved(false) }} />
                 <span className="text-sm text-gray-400 w-8">km/h</span>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number" inputMode="decimal"
-                  className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder={lastCardio ? `${lastCardio.incline}` : '0'}
-                  value={cardioIncline}
-                  onChange={e => { setCardioIncline(e.target.value); setCardioSaved(false) }}
-                />
+                <input type="number" inputMode="decimal" className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-blue-500" placeholder={lastCardio ? `${lastCardio.incline}` : '0'} value={cardioIncline} onChange={e => { setCardioIncline(e.target.value); setCardioSaved(false) }} />
                 <span className="text-sm text-gray-400 w-8">%</span>
               </div>
             </div>
 
-            <button
-              className={`w-full py-3 rounded-xl font-semibold ${cardioSaved ? 'bg-green-700 text-green-200' : 'bg-blue-600'}`}
-              onClick={handleSaveCardio}
-            >
+            <button className={`w-full py-3 rounded-xl font-semibold ${cardioSaved ? 'bg-green-700 text-green-200' : 'bg-blue-600'}`} onClick={handleSaveCardio}>
               {cardioSaved ? 'Sačuvano ✓' : 'Sačuvaj'}
             </button>
           </>
         ) : (
-          /* ---- STRENGTH ---- */
           <>
             <div className="flex gap-3">
               <InfoCard title="Serije" value={String(exercise.setsCount)} />
@@ -206,6 +225,38 @@ export default function ExerciseDetailPage() {
             </div>
           </>
         )}
+
+        {/* Recording section */}
+        <div className="border-t border-gray-800 pt-4">
+          <h2 className="text-base font-semibold mb-3">Moj snimak</h2>
+
+          {recSrc ? (
+            <div className="space-y-3">
+              <video src={recSrc} controls playsInline className="w-full rounded-2xl bg-black" />
+              <div className="flex gap-3">
+                <button className="flex-1 py-3 rounded-xl bg-green-700 font-semibold flex items-center justify-center gap-2" onClick={handleShareRecording}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Podeli
+                </button>
+                <button className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-semibold" onClick={() => cameraRef.current?.click()}>
+                  Snimi ponovo
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button className="w-full py-4 rounded-2xl bg-gray-800 border border-gray-700 border-dashed flex items-center justify-center gap-3 text-gray-400" onClick={() => cameraRef.current?.click()}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+              </svg>
+              Snimi se
+            </button>
+          )}
+
+          <input ref={cameraRef} type="file" accept="video/*" capture="environment" className="hidden" onChange={handleRecord} />
+        </div>
       </div>
 
       {showHistory && (

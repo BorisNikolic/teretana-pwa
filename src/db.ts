@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { Workout, Exercise, SetLog, CardioLog } from './types'
+import type { Workout, Exercise, SetLog, CardioLog, Recording } from './types'
 
 interface TeretanaDB extends DBSchema {
   workouts: { key: string; value: Workout; indexes: { order: number } }
@@ -7,13 +7,14 @@ interface TeretanaDB extends DBSchema {
   videos: { key: string; value: { id: string; blob: Blob } }
   setLogs: { key: string; value: SetLog; indexes: { exerciseId: string } }
   cardioLogs: { key: string; value: CardioLog; indexes: { exerciseId: string } }
+  recordings: { key: string; value: Recording; indexes: { exerciseId: string } }
 }
 
 let db: IDBPDatabase<TeretanaDB>
 
 async function getDB() {
   if (!db) {
-    db = await openDB<TeretanaDB>('teretana', 3, {
+    db = await openDB<TeretanaDB>('teretana', 4, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const workouts = db.createObjectStore('workouts', { keyPath: 'id' })
@@ -30,6 +31,10 @@ async function getDB() {
         if (oldVersion < 3) {
           const cardioLogs = db.createObjectStore('cardioLogs', { keyPath: 'id' })
           cardioLogs.createIndex('exerciseId', 'exerciseId')
+        }
+        if (oldVersion < 4) {
+          const recordings = db.createObjectStore('recordings', { keyPath: 'id' })
+          recordings.createIndex('exerciseId', 'exerciseId')
         }
       },
     })
@@ -293,6 +298,27 @@ export async function getMonthlyReport(yearMonth: string): Promise<string> {
     if (hasData) lines.push('')
   }
   return lines.join('\n').trim()
+}
+
+// Recordings (user filming themselves)
+export async function saveRecording(exerciseId: string, blob: Blob): Promise<void> {
+  const db = await getDB()
+  const date = today()
+  const existing = await db.getAllFromIndex('recordings', 'exerciseId', exerciseId)
+  const toReplace = existing.find(r => r.date === date)
+  await db.put('recordings', { id: toReplace?.id ?? uuid(), exerciseId, date, blob, timestamp: Date.now() })
+}
+
+export async function getTodayRecording(exerciseId: string): Promise<Recording | null> {
+  const db = await getDB()
+  const all = await db.getAllFromIndex('recordings', 'exerciseId', exerciseId)
+  return all.find(r => r.date === today()) ?? null
+}
+
+export async function getRecordings(exerciseId: string): Promise<Recording[]> {
+  const db = await getDB()
+  const all = await db.getAllFromIndex('recordings', 'exerciseId', exerciseId)
+  return all.sort((a, b) => b.timestamp - a.timestamp)
 }
 
 // Videos

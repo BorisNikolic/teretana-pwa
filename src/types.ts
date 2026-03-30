@@ -35,3 +35,11 @@ export interface CardioLog {
   date: string
   timestamp: number
 }
+
+export interface Recording {
+  id: string
+  exerciseId: string
+  date: string
+  blob: Blob
+  timestamp: number
+}
