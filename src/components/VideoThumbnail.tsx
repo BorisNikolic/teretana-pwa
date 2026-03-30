@@ -18,14 +18,13 @@ export default function VideoThumbnail({ exerciseId, className = '' }: Props) {
       video.playsInline = true
       video.currentTime = 0.5
       video.addEventListener('seeked', () => {
-        const maxDim = 240
-        const vw = video.videoWidth || maxDim, vh = video.videoHeight || maxDim
-        const scale = Math.min(maxDim / vw, maxDim / vh)
+        const vw = video.videoWidth || 320, vh = video.videoHeight || 240
+        const scale = Math.min(480 / vw, 480 / vh)
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(vw * scale)
         canvas.height = Math.round(vh * scale)
         canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height)
-        setSrc(canvas.toDataURL('image/jpeg', 0.8))
+        setSrc(canvas.toDataURL('image/jpeg', 0.85))
         URL.revokeObjectURL(objectUrl!)
       }, { once: true })
       video.load()
@@ -44,9 +43,5 @@ export default function VideoThumbnail({ exerciseId, className = '' }: Props) {
     )
   }
 
-  return (
-    <div className={`bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden ${className}`}>
-      <img src={src} className="max-w-full max-h-full object-contain" />
-    </div>
-  )
+  return <img src={src} className={`object-cover rounded-lg ${className}`} />
 }
