@@ -10,6 +10,7 @@ export interface Exercise {
   workoutId: string
   name: string
   order: number
+  type: 'strength' | 'cardio'
   setsCount: number
   reps: string
   restSeconds: number
@@ -21,6 +22,16 @@ export interface SetLog {
   exerciseId: string
   setIndex: number
   weight: number
-  date: string      // YYYY-MM-DD
+  date: string
+  timestamp: number
+}
+
+export interface CardioLog {
+  id: string
+  exerciseId: string
+  duration: number   // seconds
+  incline: number    // percent
+  speed: number      // km/h
+  date: string
   timestamp: number
 }

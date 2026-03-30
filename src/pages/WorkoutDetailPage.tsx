@@ -5,13 +5,15 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import type { Exercise, Workout } from '../types'
 import { getWorkouts, getExercises, addExercise, deleteExercise, updateExercise, saveVideo } from '../db'
-import AddExerciseModal from '../components/AddExerciseModal'
+import AddExerciseModal, { type ExerciseFormData } from '../components/AddExerciseModal'
+import SessionSummary from '../components/SessionSummary'
 import VideoThumbnail from '../components/VideoThumbnail'
 
-function ExerciseRow({ exercise, completedSets, onDelete }: { exercise: Exercise; completedSets: number; onDelete: () => void }) {
+function ExerciseRow({ exercise, onDelete }: { exercise: Exercise; onDelete: () => void }) {
   const navigate = useNavigate()
   const { workoutId } = useParams()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: exercise.id })
+  const isCardio = (exercise.type ?? 'strength') === 'cardio'
 
   return (
     <div
@@ -27,19 +29,12 @@ function ExerciseRow({ exercise, completedSets, onDelete }: { exercise: Exercise
 
       <VideoThumbnail exerciseId={exercise.id} className="w-14 h-14 shrink-0" />
 
-      <button
-        className="flex-1 text-left min-w-0"
-        onClick={() => navigate(`/workout/${workoutId}/exercise/${exercise.id}`)}
-      >
+      <button className="flex-1 text-left min-w-0" onClick={() => navigate(`/workout/${workoutId}/exercise/${exercise.id}`)}>
         <div className="font-semibold truncate">{exercise.name}</div>
-        <div className="text-sm text-gray-400">{exercise.setsCount} × {exercise.reps}</div>
+        <div className="text-sm text-gray-400">
+          {isCardio ? 'Kardio' : `${exercise.setsCount} × ${exercise.reps}`}
+        </div>
       </button>
-
-      {completedSets > 0 && (
-        <span className={`text-xs font-semibold shrink-0 ${completedSets === exercise.setsCount ? 'text-green-400' : 'text-orange-400'}`}>
-          {completedSets}/{exercise.setsCount}
-        </span>
-      )}
 
       <button className="text-gray-600 p-1 shrink-0" onClick={onDelete}>
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -56,6 +51,7 @@ export default function WorkoutDetailPage() {
   const [workout, setWorkout] = useState<Workout | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [showAdd, setShowAdd] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
 
   const load = async () => {
@@ -66,9 +62,12 @@ export default function WorkoutDetailPage() {
   }
   useEffect(() => { load() }, [workoutId])
 
-  const handleAdd = async (data: { name: string; setsCount: number; reps: string; restSeconds: number; notes: string; videoBlob?: Blob }) => {
+  const handleAdd = async (data: ExerciseFormData) => {
     if (!workoutId) return
-    const ex = await addExercise({ workoutId, name: data.name, order: exercises.length, setsCount: data.setsCount, reps: data.reps, restSeconds: data.restSeconds, notes: data.notes })
+    const ex = await addExercise({
+      workoutId, name: data.name, order: exercises.length, type: data.type,
+      setsCount: data.setsCount, reps: data.reps, restSeconds: data.restSeconds, notes: data.notes,
+    })
     if (data.videoBlob) await saveVideo(ex.id, data.videoBlob)
     setShowAdd(false)
     load()
@@ -98,17 +97,14 @@ export default function WorkoutDetailPage() {
           </svg>
         </button>
         <h1 className="text-2xl font-bold flex-1">{workout?.name}</h1>
-        <button
-          className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center"
-          onClick={() => setShowAdd(true)}
-        >
+        <button className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center" onClick={() => setShowAdd(true)}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
         </button>
       </div>
 
-      <div className="flex-1 px-4 pb-8">
+      <div className="flex-1 px-4">
         {exercises.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500">
             <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
@@ -121,12 +117,7 @@ export default function WorkoutDetailPage() {
             <SortableContext items={exercises.map(e => e.id)} strategy={verticalListSortingStrategy}>
               <div className="flex flex-col gap-3">
                 {exercises.map(ex => (
-                  <ExerciseRow
-                    key={ex.id}
-                    exercise={ex}
-                    completedSets={0}
-                    onDelete={() => handleDelete(ex.id)}
-                  />
+                  <ExerciseRow key={ex.id} exercise={ex} onDelete={() => handleDelete(ex.id)} />
                 ))}
               </div>
             </SortableContext>
@@ -134,7 +125,20 @@ export default function WorkoutDetailPage() {
         )}
       </div>
 
+      {/* Finish workout button */}
+      {exercises.length > 0 && (
+        <div className="px-4 py-6">
+          <button
+            className="w-full py-4 rounded-2xl bg-green-700 font-semibold text-lg flex items-center justify-center gap-2"
+            onClick={() => setShowSummary(true)}
+          >
+            Završi trening
+          </button>
+        </div>
+      )}
+
       {showAdd && <AddExerciseModal onSave={handleAdd} onClose={() => setShowAdd(false)} />}
+      {showSummary && workoutId && <SessionSummary workoutId={workoutId} onClose={() => setShowSummary(false)} />}
     </div>
   )
 }

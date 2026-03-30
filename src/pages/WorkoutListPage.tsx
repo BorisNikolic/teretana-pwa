@@ -35,6 +35,7 @@ function WorkoutRow({ workout, onDelete }: { workout: Workout; onDelete: () => v
 }
 
 export default function WorkoutListPage() {
+  const navigate = useNavigate()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [showAdd, setShowAdd] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -67,14 +68,18 @@ export default function WorkoutListPage() {
     <div className="flex flex-col min-h-screen">
       <div className="flex items-center justify-between px-4 pt-14 pb-4">
         <h1 className="text-2xl font-bold">Treninzi</h1>
-        <button
-          className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center"
-          onClick={() => setShowAdd(true)}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400" onClick={() => navigate('/progress')}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            </svg>
+          </button>
+          <button className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center" onClick={() => setShowAdd(true)}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 px-4 pb-8">

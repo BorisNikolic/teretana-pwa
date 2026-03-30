@@ -1,18 +1,19 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { Workout, Exercise, SetLog } from './types'
+import type { Workout, Exercise, SetLog, CardioLog } from './types'
 
 interface TeretanaDB extends DBSchema {
   workouts: { key: string; value: Workout; indexes: { order: number } }
   exercises: { key: string; value: Exercise; indexes: { workoutId: string; order: number } }
   videos: { key: string; value: { id: string; blob: Blob } }
   setLogs: { key: string; value: SetLog; indexes: { exerciseId: string } }
+  cardioLogs: { key: string; value: CardioLog; indexes: { exerciseId: string } }
 }
 
 let db: IDBPDatabase<TeretanaDB>
 
 async function getDB() {
   if (!db) {
-    db = await openDB<TeretanaDB>('teretana', 2, {
+    db = await openDB<TeretanaDB>('teretana', 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const workouts = db.createObjectStore('workouts', { keyPath: 'id' })
@@ -26,6 +27,10 @@ async function getDB() {
           const setLogs = db.createObjectStore('setLogs', { keyPath: 'id' })
           setLogs.createIndex('exerciseId', 'exerciseId')
         }
+        if (oldVersion < 3) {
+          const cardioLogs = db.createObjectStore('cardioLogs', { keyPath: 'id' })
+          cardioLogs.createIndex('exerciseId', 'exerciseId')
+        }
       },
     })
   }
@@ -34,6 +39,10 @@ async function getDB() {
 
 function uuid() {
   return crypto.randomUUID()
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10)
 }
 
 // Workouts
@@ -58,7 +67,7 @@ export async function updateWorkout(workout: Workout): Promise<void> {
 export async function deleteWorkout(id: string): Promise<void> {
   const db = await getDB()
   const exercises = await getExercises(id)
-  const tx = db.transaction(['workouts', 'exercises', 'videos'], 'readwrite')
+  const tx = db.transaction(['workouts', 'exercises', 'videos', 'setLogs', 'cardioLogs'], 'readwrite')
   await tx.objectStore('workouts').delete(id)
   for (const ex of exercises) {
     await tx.objectStore('exercises').delete(ex.id)
@@ -94,14 +103,13 @@ export async function deleteExercise(id: string): Promise<void> {
   await tx.done
 }
 
-// SetLogs
+// SetLogs (strength)
 export async function saveSetLog(exerciseId: string, setIndex: number, weight: number): Promise<void> {
   const db = await getDB()
-  const date = new Date().toISOString().slice(0, 10)
+  const date = today()
   const existing = await db.getAllFromIndex('setLogs', 'exerciseId', exerciseId)
   const toReplace = existing.find(l => l.date === date && l.setIndex === setIndex)
-  const log: SetLog = { id: toReplace?.id ?? uuid(), exerciseId, setIndex, weight, date, timestamp: Date.now() }
-  await db.put('setLogs', log)
+  await db.put('setLogs', { id: toReplace?.id ?? uuid(), exerciseId, setIndex, weight, date, timestamp: Date.now() })
 }
 
 export async function getSetLogs(exerciseId: string): Promise<SetLog[]> {
@@ -114,8 +122,112 @@ export async function getLastSessionWeights(exerciseId: string): Promise<Record<
   const logs = await getSetLogs(exerciseId)
   if (!logs.length) return {}
   const lastDate = logs[0].date
-  const lastSession = logs.filter(l => l.date === lastDate)
-  return Object.fromEntries(lastSession.map(l => [l.setIndex, l.weight]))
+  return Object.fromEntries(logs.filter(l => l.date === lastDate).map(l => [l.setIndex, l.weight]))
+}
+
+export async function getTodaySetLogs(exerciseId: string): Promise<SetLog[]> {
+  const logs = await getSetLogs(exerciseId)
+  return logs.filter(l => l.date === today())
+}
+
+// CardioLogs
+export async function saveCardioLog(exerciseId: string, duration: number, incline: number, speed: number): Promise<void> {
+  const db = await getDB()
+  const date = today()
+  const existing = await db.getAllFromIndex('cardioLogs', 'exerciseId', exerciseId)
+  const toReplace = existing.find(l => l.date === date)
+  await db.put('cardioLogs', { id: toReplace?.id ?? uuid(), exerciseId, duration, incline, speed, date, timestamp: Date.now() })
+}
+
+export async function getCardioLogs(exerciseId: string): Promise<CardioLog[]> {
+  const db = await getDB()
+  const logs = await db.getAllFromIndex('cardioLogs', 'exerciseId', exerciseId)
+  return logs.sort((a, b) => b.timestamp - a.timestamp)
+}
+
+export async function getLastCardioLog(exerciseId: string): Promise<CardioLog | null> {
+  const logs = await getCardioLogs(exerciseId)
+  return logs[0] ?? null
+}
+
+// Session Summary
+function formatDateSr(dateStr: string) {
+  const [y, m, d] = dateStr.split('-')
+  return `${parseInt(d)}. ${parseInt(m)}. ${y}.`
+}
+
+function formatDuration(sec: number) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return s > 0 ? `${m}min ${s}s` : `${m}min`
+}
+
+export async function getSessionSummary(workoutId: string, date?: string): Promise<string> {
+  const d = date ?? today()
+  const workout = (await getWorkouts()).find(w => w.id === workoutId)
+  const exercises = await getExercises(workoutId)
+  const lines: string[] = [`Trening: ${workout?.name ?? ''}`, formatDateSr(d), '']
+
+  for (const ex of exercises) {
+    if ((ex.type ?? 'strength') === 'cardio') {
+      const logs = await getCardioLogs(ex.id)
+      const log = logs.find(l => l.date === d)
+      if (log) {
+        lines.push(`${ex.name}: ${formatDuration(log.duration)}, ${log.speed} km/h, nagib ${log.incline}%`)
+      } else {
+        lines.push(`${ex.name}: —`)
+      }
+    } else {
+      const allLogs = await getSetLogs(ex.id)
+      const todayLogs = allLogs.filter(l => l.date === d).sort((a, b) => a.setIndex - b.setIndex)
+      if (todayLogs.length > 0) {
+        const weights = todayLogs.map(l => `${l.weight}`).join('/')
+        lines.push(`${ex.name}: ${ex.setsCount}×${ex.reps} — ${weights} kg`)
+      } else {
+        lines.push(`${ex.name}: —`)
+      }
+    }
+  }
+  return lines.join('\n')
+}
+
+// Monthly Report
+const MONTH_NAMES_SR = ['', 'januar', 'februar', 'mart', 'april', 'maj', 'jun', 'jul', 'avgust', 'septembar', 'oktobar', 'novembar', 'decembar']
+
+export async function getMonthlyReport(yearMonth: string): Promise<string> {
+  const [y, m] = yearMonth.split('-')
+  const workouts = await getWorkouts()
+  const lines: string[] = [`Mesečni izveštaj — ${MONTH_NAMES_SR[parseInt(m)]} ${y}`, '']
+
+  for (const workout of workouts) {
+    const exercises = await getExercises(workout.id)
+    let hasData = false
+
+    for (const ex of exercises) {
+      if ((ex.type ?? 'strength') === 'cardio') {
+        const logs = (await getCardioLogs(ex.id)).filter(l => l.date.startsWith(yearMonth))
+        if (logs.length > 0) {
+          const first = logs[logs.length - 1]
+          const last = logs[0]
+          if (!hasData) { lines.push(`${workout.name}:`); hasData = true }
+          lines.push(`  ${ex.name}: ${formatDuration(first.duration)}/${first.speed}km/h → ${formatDuration(last.duration)}/${last.speed}km/h`)
+        }
+      } else {
+        const logs = (await getSetLogs(ex.id)).filter(l => l.date.startsWith(yearMonth))
+        if (logs.length > 0) {
+          const dates = [...new Set(logs.map(l => l.date))].sort()
+          const firstDate = dates[0]
+          const lastDate = dates[dates.length - 1]
+          const firstMax = Math.max(...logs.filter(l => l.date === firstDate).map(l => l.weight))
+          const lastMax = Math.max(...logs.filter(l => l.date === lastDate).map(l => l.weight))
+          if (!hasData) { lines.push(`${workout.name}:`); hasData = true }
+          lines.push(`  ${ex.name}: ${firstMax} → ${lastMax} kg`)
+        }
+      }
+    }
+    if (hasData) lines.push('')
+  }
+  return lines.join('\n').trim()
 }
 
 // Videos

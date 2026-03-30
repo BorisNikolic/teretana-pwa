@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import WorkoutListPage from './pages/WorkoutListPage'
 import WorkoutDetailPage from './pages/WorkoutDetailPage'
 import ExerciseDetailPage from './pages/ExerciseDetailPage'
+import ProgressReportPage from './pages/ProgressReportPage'
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
           <Route path="/" element={<WorkoutListPage />} />
           <Route path="/workout/:workoutId" element={<WorkoutDetailPage />} />
           <Route path="/workout/:workoutId/exercise/:exerciseId" element={<ExerciseDetailPage />} />
+          <Route path="/progress" element={<ProgressReportPage />} />
         </Routes>
       </div>
     </HashRouter>
