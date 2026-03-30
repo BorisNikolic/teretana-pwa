@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getVideo } from '../db'
 
 interface Props { exerciseId: string; className?: string }
 
 export default function VideoThumbnail({ exerciseId, className = '' }: Props) {
   const [src, setSrc] = useState<string | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     let objectUrl: string | null = null
@@ -17,13 +16,18 @@ export default function VideoThumbnail({ exerciseId, className = '' }: Props) {
       video.src = objectUrl
       video.muted = true
       video.playsInline = true
-      video.currentTime = 0.1
+      video.currentTime = 0.5
       video.addEventListener('seeked', () => {
+        const size = 240
         const canvas = document.createElement('canvas')
-        canvas.width = 120
-        canvas.height = 80
-        canvas.getContext('2d')?.drawImage(video, 0, 0, 120, 80)
-        setSrc(canvas.toDataURL())
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')!
+        const vw = video.videoWidth, vh = video.videoHeight
+        const scale = Math.max(size / vw, size / vh)
+        const sw = vw * scale, sh = vh * scale
+        ctx.drawImage(video, (size - sw) / 2, (size - sh) / 2, sw, sh)
+        setSrc(canvas.toDataURL('image/jpeg', 0.8))
         URL.revokeObjectURL(objectUrl!)
       }, { once: true })
       video.load()
@@ -42,5 +46,5 @@ export default function VideoThumbnail({ exerciseId, className = '' }: Props) {
     )
   }
 
-  return <img src={src} className={`object-cover rounded-lg ${className}`} ref={videoRef as never} />
+  return <img src={src} className={`object-cover rounded-lg ${className}`} />
 }

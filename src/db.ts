@@ -150,6 +150,71 @@ export async function getLastCardioLog(exerciseId: string): Promise<CardioLog | 
   return logs[0] ?? null
 }
 
+// Workout Log — all sessions across all workouts
+export interface SessionEntry {
+  date: string
+  workoutId: string
+  workoutName: string
+  lines: string[]
+}
+
+export async function getWorkoutLog(): Promise<SessionEntry[]> {
+  const db = await getDB()
+  const allSetLogs = await db.getAll('setLogs')
+  const allCardioLogs = await db.getAll('cardioLogs')
+  const workouts = await getWorkouts()
+  const allExercises: Exercise[] = []
+  for (const w of workouts) allExercises.push(...(await getExercises(w.id)))
+
+  const exMap = new Map(allExercises.map(e => [e.id, e]))
+  const wMap = new Map(workouts.map(w => [w.id, w]))
+
+  // Collect all (date, workoutId) pairs
+  const sessions = new Map<string, { date: string; workoutId: string; sets: typeof allSetLogs; cardio: typeof allCardioLogs }>()
+
+  for (const log of allSetLogs) {
+    const ex = exMap.get(log.exerciseId)
+    if (!ex) continue
+    const key = `${log.date}::${ex.workoutId}`
+    if (!sessions.has(key)) sessions.set(key, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] })
+    sessions.get(key)!.sets.push(log)
+  }
+  for (const log of allCardioLogs) {
+    const ex = exMap.get(log.exerciseId)
+    if (!ex) continue
+    const key = `${log.date}::${ex.workoutId}`
+    if (!sessions.has(key)) sessions.set(key, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] })
+    sessions.get(key)!.cardio.push(log)
+  }
+
+  const entries: SessionEntry[] = []
+  for (const s of sessions.values()) {
+    const workout = wMap.get(s.workoutId)
+    const exercises = allExercises.filter(e => e.workoutId === s.workoutId).sort((a, b) => a.order - b.order)
+    const lines: string[] = []
+
+    for (const ex of exercises) {
+      if ((ex.type ?? 'strength') === 'cardio') {
+        const log = s.cardio.find(l => l.exerciseId === ex.id)
+        if (log) lines.push(`${ex.name}: ${fmtDur(log.duration)}, ${log.speed} km/h, nagib ${log.incline}%`)
+      } else {
+        const logs = s.sets.filter(l => l.exerciseId === ex.id).sort((a, b) => a.setIndex - b.setIndex)
+        if (logs.length) lines.push(`${ex.name}: ${logs.map(l => `${l.weight}`).join('/')} kg`)
+      }
+    }
+    if (lines.length) {
+      entries.push({ date: s.date, workoutId: s.workoutId, workoutName: workout?.name ?? '', lines })
+    }
+  }
+  return entries.sort((a, b) => b.date.localeCompare(a.date))
+}
+
+function fmtDur(sec: number) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return s > 0 ? `${m}min ${s}s` : `${m}min`
+}
+
 // Session Summary
 function formatDateSr(dateStr: string) {
   const [y, m, d] = dateStr.split('-')
