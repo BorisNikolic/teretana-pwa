@@ -1,24 +1,31 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { Workout, Exercise } from './types'
+import type { Workout, Exercise, SetLog } from './types'
 
 interface TeretanaDB extends DBSchema {
   workouts: { key: string; value: Workout; indexes: { order: number } }
   exercises: { key: string; value: Exercise; indexes: { workoutId: string; order: number } }
   videos: { key: string; value: { id: string; blob: Blob } }
+  setLogs: { key: string; value: SetLog; indexes: { exerciseId: string } }
 }
 
 let db: IDBPDatabase<TeretanaDB>
 
 async function getDB() {
   if (!db) {
-    db = await openDB<TeretanaDB>('teretana', 1, {
-      upgrade(db) {
-        const workouts = db.createObjectStore('workouts', { keyPath: 'id' })
-        workouts.createIndex('order', 'order')
-        const exercises = db.createObjectStore('exercises', { keyPath: 'id' })
-        exercises.createIndex('workoutId', 'workoutId')
-        exercises.createIndex('order', 'order')
-        db.createObjectStore('videos', { keyPath: 'id' })
+    db = await openDB<TeretanaDB>('teretana', 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const workouts = db.createObjectStore('workouts', { keyPath: 'id' })
+          workouts.createIndex('order', 'order')
+          const exercises = db.createObjectStore('exercises', { keyPath: 'id' })
+          exercises.createIndex('workoutId', 'workoutId')
+          exercises.createIndex('order', 'order')
+          db.createObjectStore('videos', { keyPath: 'id' })
+        }
+        if (oldVersion < 2) {
+          const setLogs = db.createObjectStore('setLogs', { keyPath: 'id' })
+          setLogs.createIndex('exerciseId', 'exerciseId')
+        }
       },
     })
   }
@@ -85,6 +92,30 @@ export async function deleteExercise(id: string): Promise<void> {
   await tx.objectStore('exercises').delete(id)
   await tx.objectStore('videos').delete(id)
   await tx.done
+}
+
+// SetLogs
+export async function saveSetLog(exerciseId: string, setIndex: number, weight: number): Promise<void> {
+  const db = await getDB()
+  const date = new Date().toISOString().slice(0, 10)
+  const existing = await db.getAllFromIndex('setLogs', 'exerciseId', exerciseId)
+  const toReplace = existing.find(l => l.date === date && l.setIndex === setIndex)
+  const log: SetLog = { id: toReplace?.id ?? uuid(), exerciseId, setIndex, weight, date, timestamp: Date.now() }
+  await db.put('setLogs', log)
+}
+
+export async function getSetLogs(exerciseId: string): Promise<SetLog[]> {
+  const db = await getDB()
+  const logs = await db.getAllFromIndex('setLogs', 'exerciseId', exerciseId)
+  return logs.sort((a, b) => b.timestamp - a.timestamp)
+}
+
+export async function getLastSessionWeights(exerciseId: string): Promise<Record<number, number>> {
+  const logs = await getSetLogs(exerciseId)
+  if (!logs.length) return {}
+  const lastDate = logs[0].date
+  const lastSession = logs.filter(l => l.date === lastDate)
+  return Object.fromEntries(lastSession.map(l => [l.setIndex, l.weight]))
 }
 
 // Videos

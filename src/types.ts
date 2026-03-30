@@ -15,3 +15,12 @@ export interface Exercise {
   restSeconds: number
   notes: string
 }
+
+export interface SetLog {
+  id: string
+  exerciseId: string
+  setIndex: number
+  weight: number
+  date: string      // YYYY-MM-DD
+  timestamp: number
+}
