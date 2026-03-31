@@ -29,7 +29,7 @@ export default function SettingsPage() {
     const file = new File([blob], `teretana-backup-${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' })
     try {
       if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Teretana Backup' }); return }
-    } catch {}
+    } catch (e: any) { if (e?.name === 'AbortError' || e?.name === 'NotAllowedError') return }
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url)
     setBackupStatus('Izvezeno!'); setTimeout(() => setBackupStatus(''), 2000)
   }
