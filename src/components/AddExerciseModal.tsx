@@ -24,7 +24,7 @@ export default function AddExerciseModal({ onSave, onClose, editExercise }: Prop
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onClose}>
-      <div className="bg-gray-900 w-full rounded-t-2xl p-6 pb-10 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-gray-900 w-full rounded-t-2xl p-6 pb-10 max-h-[90vh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-semibold mb-4">{editExercise ? 'Izmeni vežbu' : 'Nova vežba'}</h2>
 
         <div className="space-y-3">
