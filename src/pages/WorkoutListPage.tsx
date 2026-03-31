@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Workout } from '../types'
 import { getWorkouts, addWorkout, deleteWorkout, updateWorkout, getLastWorkoutDate } from '../db'
 import AddWorkoutModal from '../components/AddWorkoutModal'
+import ConfirmModal from '../components/ConfirmModal'
 
 function daysAgo(dateStr: string) {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
@@ -39,6 +40,7 @@ export default function WorkoutListPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [lastDates, setLastDates] = useState<Record<string, string | null>>({})
   const [showAdd, setShowAdd] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
 
   const load = async () => {
@@ -80,12 +82,13 @@ export default function WorkoutListPage() {
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={workouts.map(w => w.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex flex-col gap-3">{workouts.map(w => <WorkoutRow key={w.id} workout={w} lastDate={lastDates[w.id]} onDelete={async () => { await deleteWorkout(w.id); load() }} />)}</div>
+              <div className="flex flex-col gap-3">{workouts.map(w => <WorkoutRow key={w.id} workout={w} lastDate={lastDates[w.id]} onDelete={() => setDeletingId(w.id)} />)}</div>
             </SortableContext>
           </DndContext>
         )}
       </div>
       {showAdd && <AddWorkoutModal onSave={async name => { await addWorkout(name, workouts.length); setShowAdd(false); load() }} onClose={() => setShowAdd(false)} />}
+      {deletingId && <ConfirmModal message="Obrisati ovaj trening?" onConfirm={async () => { await deleteWorkout(deletingId); setDeletingId(null); load() }} onCancel={() => setDeletingId(null)} />}
     </div>
   )
 }

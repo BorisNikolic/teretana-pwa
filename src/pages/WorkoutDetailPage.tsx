@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Exercise, Workout } from '../types'
 import { getWorkouts, getExercises, addExercise, deleteExercise, updateExercise, saveVideo } from '../db'
 import AddExerciseModal, { type ExerciseFormData } from '../components/AddExerciseModal'
+import ConfirmModal from '../components/ConfirmModal'
 import SessionSummary from '../components/SessionSummary'
 import VideoThumbnail from '../components/VideoThumbnail'
 
@@ -43,6 +44,7 @@ export default function WorkoutDetailPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [deletingExId, setDeletingExId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
 
   const load = async () => {
@@ -88,7 +90,7 @@ export default function WorkoutDetailPage() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={exercises.map(e => e.id)} strategy={verticalListSortingStrategy}>
               <div className="flex flex-col gap-3">
-                {exercises.map(ex => <ExerciseRow key={ex.id} exercise={ex} onDelete={async () => { await deleteExercise(ex.id); load() }} onEdit={() => setEditingExercise(ex)} />)}
+                {exercises.map(ex => <ExerciseRow key={ex.id} exercise={ex} onDelete={() => setDeletingExId(ex.id)} onEdit={() => setEditingExercise(ex)} />)}
               </div>
             </SortableContext>
           </DndContext>
@@ -102,6 +104,7 @@ export default function WorkoutDetailPage() {
       {showAdd && <AddExerciseModal onSave={handleAdd} onClose={() => setShowAdd(false)} />}
       {editingExercise && <AddExerciseModal editExercise={editingExercise} onSave={handleEdit} onClose={() => setEditingExercise(null)} />}
       {showSummary && workoutId && <SessionSummary workoutId={workoutId} onClose={() => setShowSummary(false)} />}
+      {deletingExId && <ConfirmModal message="Obrisati ovu vežbu?" onConfirm={async () => { await deleteExercise(deletingExId); setDeletingExId(null); load() }} onCancel={() => setDeletingExId(null)} />}
     </div>
   )
 }

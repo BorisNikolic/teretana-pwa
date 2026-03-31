@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { exportBackup, importBackup, saveBodyWeight, getBodyWeights, getWeeklySummary } from '../db'
 import type { BodyWeight } from '../types'
+import ConfirmModal from '../components/ConfirmModal'
 
 const MARKO_PHONE = '381644831056'
 
@@ -11,6 +12,7 @@ export default function SettingsPage() {
   const [bodyWeights, setBodyWeights] = useState<BodyWeight[]>([])
   const [bwSaved, setBwSaved] = useState(false)
   const [backupStatus, setBackupStatus] = useState('')
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -34,9 +36,16 @@ export default function SettingsPage() {
     setBackupStatus('Izvezeno!'); setTimeout(() => setBackupStatus(''), 2000)
   }
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
-    const json = await file.text()
+    setPendingImportFile(file)
+    e.target.value = ''
+  }
+
+  const confirmImport = async () => {
+    if (!pendingImportFile) return
+    const json = await pendingImportFile.text()
+    setPendingImportFile(null)
     try { await importBackup(json); setBackupStatus('Uvezeno! Osveži stranicu.'); setTimeout(() => window.location.reload(), 1500) }
     catch { setBackupStatus('Greška pri uvozu.') }
   }
@@ -110,6 +119,7 @@ export default function SettingsPage() {
           </div>
         </section>
       </div>
+      {pendingImportFile && <ConfirmModal message="Uvoz će prebrisati sve postojeće podatke. Nastavi?" confirmLabel="Uvezi" onConfirm={confirmImport} onCancel={() => setPendingImportFile(null)} />}
     </div>
   )
 }
