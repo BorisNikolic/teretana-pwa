@@ -29,9 +29,9 @@ export interface SetLog {
 export interface CardioLog {
   id: string
   exerciseId: string
-  duration: number   // seconds
-  incline: number    // percent
-  speed: number      // km/h
+  duration: number
+  incline: number
+  speed: number
   date: string
   timestamp: number
 }
@@ -41,5 +41,12 @@ export interface Recording {
   exerciseId: string
   date: string
   blob: Blob
+  timestamp: number
+}
+
+export interface BodyWeight {
+  id: string
+  weight: number
+  date: string
   timestamp: number
 }

@@ -4,6 +4,7 @@ import WorkoutDetailPage from './pages/WorkoutDetailPage'
 import ExerciseDetailPage from './pages/ExerciseDetailPage'
 import ProgressReportPage from './pages/ProgressReportPage'
 import WorkoutLogPage from './pages/WorkoutLogPage'
+import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/workout/:workoutId/exercise/:exerciseId" element={<ExerciseDetailPage />} />
           <Route path="/progress" element={<ProgressReportPage />} />
           <Route path="/log" element={<WorkoutLogPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
     </HashRouter>
