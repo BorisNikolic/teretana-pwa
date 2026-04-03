@@ -55,7 +55,7 @@ export default function WorkoutDetailPage() {
         )}
       </div>
       {exercises.length > 0 && (
-        <div className="shrink-0 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gray-950">
+        <div className="shrink-0 px-4 pt-3 pb-[calc(0.75rem+30px+env(safe-area-inset-bottom))] bg-gray-950">
           {hasActiveSession ? (
             <button className="w-full py-3 rounded-2xl bg-gray-800 text-gray-300 font-semibold" onClick={() => { clearActiveSession(); setShowSummary(true) }}>Završi trening</button>
           ) : (
