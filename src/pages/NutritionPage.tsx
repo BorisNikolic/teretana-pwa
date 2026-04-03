@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientMealPlan } from '../lib/supabase-db'
+import { useToast } from '../contexts/ToastContext'
 
 export default function NutritionPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [html, setHtml] = useState<string | null>(null)
   const [fileName, setFileName] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getClientMealPlan().then(p => { if (p) { setHtml(p.html); setFileName(p.fileName) }; setLoading(false) })
-  }, [])
+    getClientMealPlan().then(p => { if (p) { setHtml(p.html); setFileName(p.fileName) } })
+      .catch(() => showToast('Greška pri učitavanju plana ishrane'))
+      .finally(() => setLoading(false))
+  }, [showToast])
 
   return (
     <div className="flex flex-col min-h-screen">

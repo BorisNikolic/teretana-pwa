@@ -5,6 +5,7 @@ import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
 import type { Exercise } from '../types'
 import ConfirmModal from '../components/ConfirmModal'
 import EditSessionModal from '../components/EditSessionModal'
+import { useToast } from '../contexts/ToastContext'
 
 function formatDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-')
@@ -19,15 +20,18 @@ export default function WorkoutLogPage() {
   const [allExercises, setAllExercises] = useState<Exercise[]>([])
   const [deleting, setDeleting] = useState<SessionEntry | null>(null)
   const [editing, setEditing] = useState<SessionEntry | null>(null)
+  const { showToast } = useToast()
 
   const load = async () => {
-    const ws = await getAssignedWorkouts()
-    const exs: Exercise[] = []
-    for (const w of ws) exs.push(...(await getExercises(w.id)))
-    setAllExercises(exs)
-    setEntries(await getWorkoutLog(ws, exs))
+    try {
+      const ws = await getAssignedWorkouts()
+      const exs: Exercise[] = []
+      for (const w of ws) exs.push(...(await getExercises(w.id)))
+      setAllExercises(exs)
+      setEntries(await getWorkoutLog(ws, exs))
+    } catch { showToast('Greška pri učitavanju dnevnika') }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [showToast])
 
   const handleDelete = async (entry: SessionEntry) => {
     const exs = allExercises.filter(e => e.workoutId === entry.workoutId)

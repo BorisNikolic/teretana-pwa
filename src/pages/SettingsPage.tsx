@@ -4,11 +4,13 @@ import { saveBodyWeight, getBodyWeights, getWeeklySummary } from '../db'
 import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
 import type { BodyWeight, Workout, Exercise } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { tid } from '../lib/contact'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
+  const { showToast } = useToast()
   const [bw, setBw] = useState('')
   const [bodyWeights, setBodyWeights] = useState<BodyWeight[]>([])
   const [bwSaved, setBwSaved] = useState(false)
@@ -23,8 +25,8 @@ export default function SettingsPage() {
       const exs: Exercise[] = []
       for (const w of ws) exs.push(...(await getExercises(w.id)))
       setWorkouts(ws); setAllExercises(exs)
-    })
-  }, [])
+    }).catch(() => showToast('Greška pri učitavanju podataka'))
+  }, [showToast])
 
   const handleSaveBw = async () => {
     const w = parseFloat(bw); if (!w) return

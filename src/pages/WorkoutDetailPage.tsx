@@ -4,20 +4,27 @@ import type { Exercise, Workout } from '../types'
 import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
 import { saveActiveSession, clearActiveSession, getActiveSession } from '../lib/session'
 import SessionSummary from '../components/SessionSummary'
+import { useToast } from '../contexts/ToastContext'
 
 export default function WorkoutDetailPage() {
   const { workoutId } = useParams<{ workoutId: string }>()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [workout, setWorkout] = useState<Workout | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [showSummary, setShowSummary] = useState(false)
+  const [loading, setLoading] = useState(true)
   const hasActiveSession = workoutId ? getActiveSession()?.workoutId === workoutId : false
 
   useEffect(() => {
     if (!workoutId) return
-    getAssignedWorkouts().then(ws => setWorkout(ws.find(w => w.id === workoutId) ?? null))
-    getExercises(workoutId).then(setExercises)
-  }, [workoutId])
+    Promise.all([
+      getAssignedWorkouts().then(ws => setWorkout(ws.find(w => w.id === workoutId) ?? null)),
+      getExercises(workoutId).then(setExercises),
+    ]).catch(() => showToast('Greška pri učitavanju vežbi')).finally(() => setLoading(false))
+  }, [workoutId, showToast])
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">Učitavanje...</div>
 
   return (
     <div className="flex flex-col min-h-screen">

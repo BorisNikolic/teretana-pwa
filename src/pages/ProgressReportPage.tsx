@@ -4,6 +4,7 @@ import { getMonthlyReport } from '../db'
 import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
 import type { Workout, Exercise } from '../types'
 import { tid } from '../lib/contact'
+import { useToast } from '../contexts/ToastContext'
 
 function getCurrentYearMonth() {
   const d = new Date()
@@ -28,6 +29,7 @@ export default function ProgressReportPage() {
   const [yearMonth, setYearMonth] = useState(getCurrentYearMonth)
   const [report, setReport] = useState('')
   const [copied, setCopied] = useState(false)
+  const { showToast } = useToast()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [allExercises, setAllExercises] = useState<Exercise[]>([])
 
@@ -36,8 +38,8 @@ export default function ProgressReportPage() {
       const exs: Exercise[] = []
       for (const w of ws) exs.push(...(await getExercises(w.id)))
       setWorkouts(ws); setAllExercises(exs)
-    })
-  }, [])
+    }).catch(() => showToast('Greška pri učitavanju izveštaja'))
+  }, [showToast])
 
   useEffect(() => {
     if (workouts.length) getMonthlyReport(yearMonth, workouts, allExercises).then(setReport)

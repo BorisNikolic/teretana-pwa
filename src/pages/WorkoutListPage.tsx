@@ -5,6 +5,7 @@ import { getAssignedWorkouts } from '../lib/supabase-db'
 import { getAllLastWorkoutDates } from '../db'
 import { getActiveSession } from '../lib/session'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import { useToast } from '../contexts/ToastContext'
 
 function daysAgo(dateStr: string) {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
@@ -15,19 +16,25 @@ function daysAgo(dateStr: string) {
 
 export default function WorkoutListPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [lastDates, setLastDates] = useState<Record<string, string | null>>({})
+  const [loading, setLoading] = useState(true)
   const activeSession = getActiveSession()
 
   const load = useCallback(async () => {
-    const ws = await getAssignedWorkouts()
-    setWorkouts(ws)
-    setLastDates(await getAllLastWorkoutDates(ws))
-  }, [])
+    try {
+      const ws = await getAssignedWorkouts()
+      setWorkouts(ws)
+      setLastDates(await getAllLastWorkoutDates(ws))
+    } catch { showToast('Greška pri učitavanju treninga') }
+    finally { setLoading(false) }
+  }, [showToast])
 
   const refreshing = usePullToRefresh(load)
-
   useEffect(() => { load() }, [load])
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">Učitavanje...</div>
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -57,7 +64,10 @@ export default function WorkoutListPage() {
           </button>
         )}
         {workouts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500"><p>Nema dodeljenih treninga</p></div>
+          <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500">
+            <p>Nema dodeljenih treninga</p>
+            <p className="text-xs text-gray-600">Tvoj trener još nije dodelio treninge. Povuci nadole da osvežiš.</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             {workouts.map(w => (

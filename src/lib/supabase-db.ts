@@ -93,36 +93,38 @@ export async function uploadMealPlan(clientId: string, html: string, fileName: s
   if (error) throw error
 }
 
-// ── Sync functions (client → Supabase, fire-and-forget) ──
+// ── Sync functions (client → Supabase, with offline queue) ──
+
+import { syncOrQueue, deleteOrQueue } from './sync-queue'
+
+async function getUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
 
 export async function syncSetLog(exerciseId: string, setIndex: number, weight: number, date: string, timestamp: number) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-  // Upsert: delete existing then insert (no unique constraint to use upsert)
-  await supabase.from('set_logs').delete().match({ user_id: user.id, exercise_id: exerciseId, date, set_index: setIndex })
-  await supabase.from('set_logs').insert({ user_id: user.id, exercise_id: exerciseId, set_index: setIndex, weight, date, timestamp })
+  const uid = await getUserId(); if (!uid) return
+  const match = { user_id: uid, exercise_id: exerciseId, date, set_index: setIndex }
+  await syncOrQueue('set_logs', match, { ...match, weight, timestamp })
 }
 
 export async function syncCardioLog(exerciseId: string, duration: number, incline: number, speed: number, date: string, timestamp: number) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-  await supabase.from('cardio_logs').delete().match({ user_id: user.id, exercise_id: exerciseId, date })
-  await supabase.from('cardio_logs').insert({ user_id: user.id, exercise_id: exerciseId, duration, incline, speed, date, timestamp })
+  const uid = await getUserId(); if (!uid) return
+  const match = { user_id: uid, exercise_id: exerciseId, date }
+  await syncOrQueue('cardio_logs', match, { ...match, duration, incline, speed, timestamp })
 }
 
 export async function syncBodyWeight(weight: number, date: string, timestamp: number) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-  await supabase.from('body_weights').delete().match({ user_id: user.id, date })
-  await supabase.from('body_weights').insert({ user_id: user.id, weight, date, timestamp })
+  const uid = await getUserId(); if (!uid) return
+  const match = { user_id: uid, date }
+  await syncOrQueue('body_weights', match, { ...match, weight, timestamp })
 }
 
 export async function syncDeleteSessionLogs(exerciseIds: string[], date: string) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  const uid = await getUserId(); if (!uid) return
   for (const eid of exerciseIds) {
-    await supabase.from('set_logs').delete().match({ user_id: user.id, exercise_id: eid, date })
-    await supabase.from('cardio_logs').delete().match({ user_id: user.id, exercise_id: eid, date })
+    await deleteOrQueue('set_logs', { user_id: uid, exercise_id: eid, date })
+    await deleteOrQueue('cardio_logs', { user_id: uid, exercise_id: eid, date })
   }
 }
 
