@@ -39,10 +39,10 @@ export async function deleteLibraryExercise(id: string) {
 export async function uploadExerciseVideo(exerciseId: string, file: File): Promise<string> {
   const ext = file.name.split('.').pop() || 'mp4'
   const path = `${exerciseId}.${ext}`
-  // Remove old file if exists
-  await supabase.storage.from('exercise-videos').remove([path])
-  const { error: uploadError } = await supabase.storage.from('exercise-videos').upload(path, file, { upsert: true })
-  if (uploadError) throw uploadError
+  // Remove old file first, ignore errors
+  await supabase.storage.from('exercise-videos').remove([path]).catch(() => {})
+  const { error: uploadError } = await supabase.storage.from('exercise-videos').upload(path, file, { contentType: file.type || 'video/mp4' })
+  if (uploadError) throw new Error(`Upload: ${uploadError.message}`)
   const { data: { publicUrl } } = supabase.storage.from('exercise-videos').getPublicUrl(path)
   await supabase.from('exercises').update({ video_url: publicUrl }).eq('id', exerciseId)
   return publicUrl
