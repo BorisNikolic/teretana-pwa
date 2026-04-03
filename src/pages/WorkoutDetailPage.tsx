@@ -34,7 +34,7 @@ export default function WorkoutDetailPage() {
         </button>
         <h1 className="text-2xl font-bold flex-1">{workout?.name}</h1>
       </div>
-      <div className="flex-1 px-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         {exercises.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500"><p>Nema vežbi u ovom treningu</p></div>
         ) : (
@@ -55,7 +55,7 @@ export default function WorkoutDetailPage() {
         )}
       </div>
       {exercises.length > 0 && (
-        <div className="px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-0 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gray-950">
           {hasActiveSession ? (
             <button className="w-full py-3 rounded-2xl bg-gray-800 text-gray-300 font-semibold" onClick={() => { clearActiveSession(); setShowSummary(true) }}>Završi trening</button>
           ) : (
