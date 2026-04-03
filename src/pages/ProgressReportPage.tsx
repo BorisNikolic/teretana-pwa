@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMonthlyReport } from '../db'
-import { trainerPhone } from '../lib/contact'
+import { tid } from '../lib/contact'
 
 function getCurrentYearMonth() {
   const d = new Date()
@@ -32,7 +32,7 @@ export default function ProgressReportPage() {
   }, [yearMonth])
 
   const sendWhatsApp = () => {
-    window.open(`https://wa.me/${trainerPhone()}?text=${encodeURIComponent(report)}`, '_blank')
+    window.open(`https://wa.me/${tid()}?text=${encodeURIComponent(report)}`, '_blank')
   }
 
   const copyText = async () => {
