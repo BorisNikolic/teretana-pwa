@@ -79,6 +79,9 @@ create policy "admin_read_all_profiles" on public.profiles for select using (
 create policy "admin_update_profiles" on public.profiles for update using (
   exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
 );
+create policy "admin_delete_profiles" on public.profiles for delete using (
+  public.is_admin()
+);
 
 -- Workouts policies
 create policy "admin_all_workouts" on public.workouts for all using (

@@ -185,6 +185,16 @@ export async function getClientMonthlyReport(clientId: string, yearMonth: string
   return formatMonthlyReport(yearMonth, workouts, allExercises, await getClientSetLogs(clientId), await getClientCardioLogs(clientId), await getClientBodyWeights(clientId))
 }
 
+// ── Admin: delete client ──
+
+export async function deleteClient(clientId: string) {
+  await supabase.from('body_weights').delete().eq('user_id', clientId)
+  await supabase.from('cardio_logs').delete().eq('user_id', clientId)
+  await supabase.from('set_logs').delete().eq('user_id', clientId)
+  const { error } = await supabase.from('profiles').delete().eq('id', clientId)
+  if (error) throw error
+}
+
 // ── Mappers (snake_case → camelCase) ──
 
 function mapWorkout(row: any): Workout {

@@ -29,7 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (uid: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
-    setProfile(data as Profile | null)
+    if (!data) { await authSignOut(); setUser(null); setProfile(null); return }
+    setProfile(data as Profile)
   }
 
   useEffect(() => {

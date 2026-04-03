@@ -1,11 +1,17 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { signIn, signUp, resetPassword } from '../lib/auth'
+
+function useInitialParams() {
+  const [sp] = useSearchParams()
+  return { initMode: sp.get('mode') === 'signup' ? 'signup' as const : 'login' as const, initEmail: sp.get('email') ?? '' }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login')
-  const [email, setEmail] = useState('')
+  const { initMode, initEmail } = useInitialParams()
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(initMode)
+  const [email, setEmail] = useState(initEmail)
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [error, setError] = useState('')
