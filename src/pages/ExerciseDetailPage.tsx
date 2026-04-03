@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Exercise, CardioLog } from '../types'
 import { getExercises } from '../lib/supabase-db'
-import { getVideo, saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording, getPersonalRecord, getTodaySetLogs } from '../db'
+import { saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording, getPersonalRecord, getTodaySetLogs } from '../db'
 import { useRestTimer } from '../hooks/useRestTimer'
 import InfoCard from '../components/InfoCard'
 import ExerciseHistory from '../components/ExerciseHistory'
@@ -37,8 +37,7 @@ export default function ExerciseDetailPage() {
     if (!workoutId || !exerciseId) return
     // Reset state for new exercise
     setCompleted(new Set()); setWeights({}); setCardioDuration(''); setCardioSpeed(''); setCardioIncline(''); setCardioSaved(false); setNewPr(false); setRecSrc(null); setRecBlob(null)
-    getExercises(workoutId).then(list => { setAllExercises(list); setExercise(list.find(e => e.id === exerciseId) ?? null) })
-    getVideo(exerciseId).then(blob => { if (blob) setVideoSrc(URL.createObjectURL(blob)); else setVideoSrc(null) })
+    getExercises(workoutId).then(list => { setAllExercises(list); const ex = list.find(e => e.id === exerciseId) ?? null; setExercise(ex); setVideoSrc(ex?.videoUrl ?? null) })
     getLastSessionWeights(exerciseId).then(setLastWeights)
     getPersonalRecord(exerciseId).then(setPr)
     const todayDate = new Date().toISOString().slice(0, 10)
@@ -58,7 +57,7 @@ export default function ExerciseDetailPage() {
       }
     })
     getTodayRecording(exerciseId).then(rec => { if (rec) { setRecBlob(rec.blob); setRecSrc(URL.createObjectURL(rec.blob)) } })
-    return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); if (recSrc) URL.revokeObjectURL(recSrc) }
+    return () => { if (recSrc) URL.revokeObjectURL(recSrc) }
   }, [exerciseId])
 
   const isCardio = (exercise?.type ?? 'strength') === 'cardio'

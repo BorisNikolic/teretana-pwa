@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getClients, deleteClient } from '../../lib/supabase-db'
+import { getClients, deleteClient, inviteClient } from '../../lib/supabase-db'
 import type { Profile } from '../../contexts/AuthContext'
 import ConfirmModal from '../../components/ConfirmModal'
 import { useToast } from '../../contexts/ToastContext'
@@ -18,8 +18,8 @@ export default function AdminClientsPage() {
   const [search, setSearch] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteMsg, setInviteMsg] = useState('')
   const [copied, setCopied] = useState(false)
+  const [sending, setSending] = useState(false)
   const [deleting, setDeleting] = useState<Profile | null>(null)
 
   const load = () => getClients().then(c => { setClients(c); setLoading(false) }).catch(() => showToast('Greška pri učitavanju vežbača'))
@@ -33,9 +33,15 @@ export default function AdminClientsPage() {
       })
     : clients
 
-  const handleInvite = () => {
+  const handleEmailInvite = async () => {
     if (!inviteEmail.trim()) return
-    setInviteMsg(buildInviteMessage(inviteEmail.trim()))
+    setSending(true)
+    try {
+      await inviteClient(inviteEmail.trim())
+      showToast('Pozivnica poslata na ' + inviteEmail.trim(), 'success')
+      setInviteEmail('')
+    } catch (e: any) { showToast(e.message || 'Greška pri slanju pozivnice') }
+    finally { setSending(false) }
   }
 
   const handleDelete = async (client: Profile) => {
@@ -54,7 +60,7 @@ export default function AdminClientsPage() {
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <h1 className="text-2xl font-bold flex-1">Vežbači</h1>
-        <button className="text-sm bg-blue-600 px-4 py-2 rounded-xl font-semibold" onClick={() => { setInviteOpen(!inviteOpen); setInviteMsg(''); setInviteEmail(''); setCopied(false) }}>
+        <button className="text-sm bg-blue-600 px-4 py-2 rounded-xl font-semibold" onClick={() => { setInviteOpen(!inviteOpen); setInviteEmail(''); setCopied(false) }}>
           {inviteOpen ? 'Zatvori' : '+ Pozovi'}
         </button>
       </div>
@@ -63,23 +69,27 @@ export default function AdminClientsPage() {
         {/* Invite section */}
         {inviteOpen && (
           <section className="bg-gray-900 rounded-2xl p-4 space-y-3">
-            <p className="text-sm text-gray-400">Unesi email novog vežbača i pošalji mu pozivnicu.</p>
+            <p className="text-sm text-gray-400">Unesi email novog vežbača.</p>
             <div className="flex gap-2">
-              <input type="email" className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none" placeholder="email@primer.com" value={inviteEmail} onChange={e => { setInviteEmail(e.target.value); setInviteMsg(''); setCopied(false) }} />
-              <button className="px-4 rounded-xl bg-blue-600 font-semibold shrink-0 disabled:opacity-40" disabled={!inviteEmail.trim()} onClick={handleInvite}>Generiši</button>
+              <input type="email" className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none" placeholder="email@primer.com" value={inviteEmail} onChange={e => { setInviteEmail(e.target.value); setCopied(false) }} />
             </div>
-            {inviteMsg && (
-              <>
-                <pre className="bg-gray-800 rounded-xl p-3 text-sm whitespace-pre-wrap text-gray-300">{inviteMsg}</pre>
-                <div className="flex gap-3">
-                  <button className="flex-1 py-3 rounded-xl bg-green-700 font-semibold" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(inviteMsg)}`, '_blank')}>
-                    WhatsApp
-                  </button>
-                  <button className={`flex-1 py-3 rounded-xl font-semibold ${copied ? 'bg-green-800 text-green-200' : 'bg-gray-800 text-gray-300'}`} onClick={async () => { await navigator.clipboard.writeText(inviteMsg); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
-                    {copied ? 'Kopirano ✓' : 'Kopiraj'}
-                  </button>
-                </div>
-              </>
+            {inviteEmail.trim() && (
+              <div className="space-y-2">
+                {/* Email invite */}
+                <button className="w-full py-3 rounded-xl bg-blue-600 font-semibold disabled:opacity-40 flex items-center justify-center gap-2" disabled={sending} onClick={handleEmailInvite}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                  {sending ? 'Šalje se...' : 'Pošalji pozivnicu na email'}
+                </button>
+                {/* WhatsApp */}
+                <button className="w-full py-3 rounded-xl bg-green-700 font-semibold flex items-center justify-center gap-2" onClick={() => { window.open(`https://wa.me/?text=${encodeURIComponent(buildInviteMessage(inviteEmail.trim()))}`, '_blank') }}>
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.253-.15-2.866.852.852-2.866-.15-.253A8 8 0 1112 20z"/></svg>
+                  Pošalji preko WhatsApp-a
+                </button>
+                {/* Copy */}
+                <button className={`w-full py-3 rounded-xl font-semibold ${copied ? 'bg-green-800 text-green-200' : 'bg-gray-800 text-gray-300'}`} onClick={async () => { await navigator.clipboard.writeText(buildInviteMessage(inviteEmail.trim())); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
+                  {copied ? 'Kopirano ✓' : 'Kopiraj pozivnicu'}
+                </button>
+              </div>
             )}
           </section>
         )}

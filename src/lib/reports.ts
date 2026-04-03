@@ -91,8 +91,8 @@ export function formatMonthlyReport(yearMonth: string, workouts: Workout[], allE
 export function formatWorkoutLog(workouts: Workout[], allExercises: Exercise[], allSets: SetLog[], allCardio: CardioLog[]): SessionEntry[] {
   const exMap = new Map(allExercises.map(e => [e.id, e])), wMap = new Map(workouts.map(w => [w.id, w]))
   const sessions = new Map<string, { date: string; workoutId: string; sets: SetLog[]; cardio: CardioLog[] }>()
-  for (const log of allSets) { const ex = exMap.get(log.exerciseId); if (!ex) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.sets.push(log) }
-  for (const log of allCardio) { const ex = exMap.get(log.exerciseId); if (!ex) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.cardio.push(log) }
+  for (const log of allSets) { const ex = exMap.get(log.exerciseId); if (!ex?.workoutId) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.sets.push(log) }
+  for (const log of allCardio) { const ex = exMap.get(log.exerciseId); if (!ex?.workoutId) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.cardio.push(log) }
   const entries: SessionEntry[] = []
   for (const s of sessions.values()) {
     const exs = allExercises.filter(e => e.workoutId === s.workoutId).sort((a, b) => a.order - b.order); const lines: string[] = []

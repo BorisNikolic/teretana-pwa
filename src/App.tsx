@@ -19,6 +19,7 @@ const AdminWorkoutsPage = lazy(() => import('./pages/admin/AdminWorkoutsPage'))
 const AdminWorkoutDetailPage = lazy(() => import('./pages/admin/AdminWorkoutDetailPage'))
 const AdminClientsPage = lazy(() => import('./pages/admin/AdminClientsPage'))
 const AdminClientDetailPage = lazy(() => import('./pages/admin/AdminClientDetailPage'))
+const AdminExerciseLibraryPage = lazy(() => import('./pages/admin/AdminExerciseLibraryPage'))
 
 const Loading = () => <div className="flex items-center justify-center min-h-screen text-gray-500">Učitavanje...</div>
 
@@ -52,6 +53,7 @@ export default function App() {
                 <Route path="/settings" element={<AuthGuard><SettingsPage /></AuthGuard>} />
                 <Route path="/ishrana" element={<AuthGuard><NutritionPage /></AuthGuard>} />
                 <Route path="/admin" element={<AuthGuard><AdminGuard><AdminDashboard /></AdminGuard></AuthGuard>} />
+                <Route path="/admin/exercises" element={<AuthGuard><AdminGuard><AdminExerciseLibraryPage /></AdminGuard></AuthGuard>} />
                 <Route path="/admin/workouts" element={<AuthGuard><AdminGuard><AdminWorkoutsPage /></AdminGuard></AuthGuard>} />
                 <Route path="/admin/workouts/:workoutId" element={<AuthGuard><AdminGuard><AdminWorkoutDetailPage /></AdminGuard></AuthGuard>} />
                 <Route path="/admin/clients" element={<AuthGuard><AdminGuard><AdminClientsPage /></AdminGuard></AuthGuard>} />

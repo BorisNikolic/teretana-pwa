@@ -7,7 +7,7 @@ export interface Workout {
 
 export interface Exercise {
   id: string
-  workoutId: string
+  workoutId?: string
   name: string
   order: number
   type: 'strength' | 'cardio'
@@ -15,6 +15,19 @@ export interface Exercise {
   reps: string
   restSeconds: number
   notes: string
+  videoUrl: string | null
+}
+
+export interface WorkoutExercise {
+  id: string
+  workoutId: string
+  exerciseId: string
+  order: number
+  exercise: Exercise
+  setsCount?: number | null
+  reps?: string | null
+  restSeconds?: number | null
+  notes?: string | null
 }
 
 export interface SetLog {
