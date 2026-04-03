@@ -7,6 +7,7 @@ import type { Workout } from '../types'
 import { getWorkouts, addWorkout, deleteWorkout, updateWorkout, getLastWorkoutDate } from '../db'
 import AddWorkoutModal from '../components/AddWorkoutModal'
 import ConfirmModal from '../components/ConfirmModal'
+import { getActiveSession } from '../lib/session'
 
 function daysAgo(dateStr: string) {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
@@ -41,6 +42,7 @@ export default function WorkoutListPage() {
   const [lastDates, setLastDates] = useState<Record<string, string | null>>({})
   const [showAdd, setShowAdd] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const activeSession = getActiveSession()
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
 
   const load = async () => {
@@ -77,6 +79,12 @@ export default function WorkoutListPage() {
         </div>
       </div>
       <div className="flex-1 px-4 pb-8">
+        {activeSession && workouts.find(w => w.id === activeSession.workoutId) && (
+          <button className="w-full mb-4 py-3 rounded-2xl bg-blue-600/20 border border-blue-600/40 text-blue-400 font-semibold text-left px-4 flex items-center justify-between" onClick={() => navigate(`/workout/${activeSession.workoutId}`)}>
+            <span>Nastavi: {workouts.find(w => w.id === activeSession.workoutId)!.name}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        )}
         {workouts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500"><p>Dodaj svoj prvi trening</p></div>
         ) : (

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Exercise, CardioLog } from '../types'
-import { getExercises, getVideo, saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording, getPersonalRecord } from '../db'
+import { getExercises, getVideo, saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording, getPersonalRecord, getTodaySetLogs } from '../db'
 import { useRestTimer } from '../hooks/useRestTimer'
 import InfoCard from '../components/InfoCard'
 import ExerciseHistory from '../components/ExerciseHistory'
@@ -39,8 +39,23 @@ export default function ExerciseDetailPage() {
     getExercises(workoutId).then(list => { setAllExercises(list); setExercise(list.find(e => e.id === exerciseId) ?? null) })
     getVideo(exerciseId).then(blob => { if (blob) setVideoSrc(URL.createObjectURL(blob)); else setVideoSrc(null) })
     getLastSessionWeights(exerciseId).then(setLastWeights)
-    getLastCardioLog(exerciseId).then(setLastCardio)
     getPersonalRecord(exerciseId).then(setPr)
+    const todayDate = new Date().toISOString().slice(0, 10)
+    getTodaySetLogs(exerciseId).then(logs => {
+      if (logs.length > 0) {
+        setCompleted(new Set(logs.map(l => l.setIndex)))
+        setWeights(Object.fromEntries(logs.map(l => [l.setIndex, l.weight > 0 ? String(l.weight) : ''])))
+      }
+    })
+    getLastCardioLog(exerciseId).then(log => {
+      setLastCardio(log)
+      if (log?.date === todayDate) {
+        setCardioDuration(String(Math.round(log.duration / 60)))
+        setCardioSpeed(String(log.speed))
+        setCardioIncline(String(log.incline))
+        setCardioSaved(true)
+      }
+    })
     getTodayRecording(exerciseId).then(rec => { if (rec) { setRecBlob(rec.blob); setRecSrc(URL.createObjectURL(rec.blob)) } })
     return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); if (recSrc) URL.revokeObjectURL(recSrc) }
   }, [exerciseId])

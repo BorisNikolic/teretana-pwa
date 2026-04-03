@@ -81,6 +81,9 @@ export async function getLastSessionWeights(exerciseId: string): Promise<Record<
   const logs = await getSetLogs(exerciseId); if (!logs.length) return {}
   const last = logs[0].date; return Object.fromEntries(logs.filter(l => l.date === last).map(l => [l.setIndex, l.weight]))
 }
+export async function getTodaySetLogs(exerciseId: string): Promise<SetLog[]> {
+  return (await getSetLogs(exerciseId)).filter(l => l.date === today())
+}
 export async function getPersonalRecord(exerciseId: string): Promise<number> {
   const logs = await getSetLogs(exerciseId); return logs.length ? Math.max(...logs.map(l => l.weight)) : 0
 }
