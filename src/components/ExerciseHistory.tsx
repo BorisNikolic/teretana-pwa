@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SetLog, CardioLog } from '../types'
 import { getSetLogs, getCardioLogs } from '../db'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface Props {
   exerciseId: string
@@ -17,6 +18,7 @@ function formatDate(dateStr: string) {
 export default function ExerciseHistory({ exerciseId, exerciseType, setsCount, onClose }: Props) {
   const [strengthByDate, setStrengthByDate] = useState<[string, SetLog[]][]>([])
   const [cardioByDate, setCardioByDate] = useState<[string, CardioLog[]][]>([])
+  useEscapeKey(onClose)
 
   useEffect(() => {
     if (exerciseType === 'cardio') {

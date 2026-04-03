@@ -143,6 +143,23 @@ export async function getLastWorkoutDate(workoutId: string): Promise<string | nu
   return dates.length ? dates.sort().pop()! : null
 }
 
+export async function getAllLastWorkoutDates(): Promise<Record<string, string | null>> {
+  const d = await getDB()
+  const workouts = await getWorkouts()
+  const allExs: Exercise[] = []
+  for (const w of workouts) allExs.push(...(await getExercises(w.id)))
+  const exToWorkout = new Map(allExs.map(e => [e.id, e.workoutId]))
+  const allSets = await d.getAll('setLogs')
+  const allCardio = await d.getAll('cardioLogs')
+  const dates: Record<string, string[]> = {}
+  for (const w of workouts) dates[w.id] = []
+  for (const s of allSets) { const wid = exToWorkout.get(s.exerciseId); if (wid) dates[wid].push(s.date) }
+  for (const c of allCardio) { const wid = exToWorkout.get(c.exerciseId); if (wid) dates[wid].push(c.date) }
+  const result: Record<string, string | null> = {}
+  for (const w of workouts) result[w.id] = dates[w.id].length ? dates[w.id].sort().pop()! : null
+  return result
+}
+
 // ── Session summary ──
 function fmtDate(s: string) { const [y, m, d] = s.split('-'); return `${+d}. ${+m}. ${y}.` }
 function fmtDur(sec: number) { const m = Math.floor(sec / 60), s = sec % 60; return s > 0 ? `${m}min ${s}s` : `${m}min` }

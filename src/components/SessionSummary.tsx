@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSessionSummary } from '../db'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 const MARKO_PHONE = '381644831056'
 
@@ -11,6 +12,7 @@ interface Props {
 export default function SessionSummary({ workoutId, onClose }: Props) {
   const [text, setText] = useState('')
   const [copied, setCopied] = useState(false)
+  useEscapeKey(onClose)
 
   useEffect(() => {
     getSessionSummary(workoutId).then(setText)

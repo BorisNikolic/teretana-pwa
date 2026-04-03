@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import type { Exercise } from '../types'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 export interface ExerciseFormData {
   name: string; type: 'strength' | 'cardio'; setsCount: number; reps: string; restSeconds: number; notes: string; videoBlob?: Blob
@@ -21,6 +22,7 @@ export default function AddExerciseModal({ onSave, onClose, editExercise }: Prop
   const [videoBlob, setVideoBlob] = useState<Blob | undefined>()
   const [videoName, setVideoName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  useEscapeKey(onClose)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onClose}>

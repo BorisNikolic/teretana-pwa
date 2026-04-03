@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface Props {
   onSave: (name: string) => void
@@ -7,6 +8,7 @@ interface Props {
 
 export default function AddWorkoutModal({ onSave, onClose }: Props) {
   const [name, setName] = useState('')
+  useEscapeKey(onClose)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onClose}>

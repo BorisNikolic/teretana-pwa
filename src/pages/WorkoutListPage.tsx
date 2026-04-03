@@ -4,7 +4,7 @@ import { DndContext, closestCenter, type DragEndEvent, PointerSensor, TouchSenso
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Workout } from '../types'
-import { getWorkouts, addWorkout, deleteWorkout, updateWorkout, getLastWorkoutDate } from '../db'
+import { getWorkouts, addWorkout, deleteWorkout, updateWorkout, getAllLastWorkoutDates } from '../db'
 import AddWorkoutModal from '../components/AddWorkoutModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { getActiveSession } from '../lib/session'
@@ -47,9 +47,7 @@ export default function WorkoutListPage() {
 
   const load = async () => {
     const ws = await getWorkouts(); setWorkouts(ws)
-    const dates: Record<string, string | null> = {}
-    await Promise.all(ws.map(async w => { dates[w.id] = await getLastWorkoutDate(w.id) }))
-    setLastDates(dates)
+    setLastDates(await getAllLastWorkoutDates())
   }
   useEffect(() => { load() }, [])
 
