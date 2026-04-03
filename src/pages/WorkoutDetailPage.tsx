@@ -55,7 +55,7 @@ export default function WorkoutDetailPage() {
         )}
       </div>
       {exercises.length > 0 && (
-        <div className="px-4 py-6 flex flex-col gap-3">
+        <div className="px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex flex-col gap-3">
           <button className="w-full py-4 rounded-2xl bg-blue-600 font-semibold text-lg" onClick={() => { saveActiveSession(workoutId!); navigate(`/workout/${workoutId}/exercise/${exercises[0].id}`) }}>
             {hasActiveSession ? 'Nastavi trening →' : 'Započni trening →'}
           </button>
