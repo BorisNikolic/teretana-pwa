@@ -1,10 +1,12 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import WorkoutListPage from './pages/WorkoutListPage'
 import WorkoutDetailPage from './pages/WorkoutDetailPage'
 import ExerciseDetailPage from './pages/ExerciseDetailPage'
 import ProgressReportPage from './pages/ProgressReportPage'
 import WorkoutLogPage from './pages/WorkoutLogPage'
 import SettingsPage from './pages/SettingsPage'
+const NutritionPage = lazy(() => import('./pages/NutritionPage'))
 
 export default function App() {
   return (
@@ -17,6 +19,7 @@ export default function App() {
           <Route path="/progress" element={<ProgressReportPage />} />
           <Route path="/log" element={<WorkoutLogPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/ishrana" element={<Suspense><NutritionPage /></Suspense>} />
         </Routes>
       </div>
     </HashRouter>

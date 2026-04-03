@@ -37,3 +37,15 @@ button:active {
   opacity: 0.7;
   transition: opacity 0.05s;
 }
+
+.meal-plan-content h1, .meal-plan-content h2, .meal-plan-content h3 {
+  font-weight: 700;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.meal-plan-content h1 { font-size: 1.25rem; }
+.meal-plan-content h2 { font-size: 1.1rem; color: #60a5fa; }
+.meal-plan-content h3 { font-size: 1rem; color: #9ca3af; }
+.meal-plan-content p { color: #d1d5db; margin-bottom: 0.25rem; }
+.meal-plan-content ul { list-style: disc; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.meal-plan-content li { color: #d1d5db; margin-bottom: 0.15rem; font-size: 0.9rem; }

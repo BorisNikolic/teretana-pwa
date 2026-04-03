@@ -9,13 +9,14 @@ interface TeretanaDB extends DBSchema {
   cardioLogs: { key: string; value: CardioLog; indexes: { exerciseId: string } }
   recordings: { key: string; value: Recording; indexes: { exerciseId: string } }
   bodyWeights: { key: string; value: BodyWeight; indexes: { date: string } }
+  mealPlans: { key: string; value: { id: string; html: string; fileName: string; uploadedAt: number } }
 }
 
 let db: IDBPDatabase<TeretanaDB>
 
 async function getDB() {
   if (!db) {
-    db = await openDB<TeretanaDB>('teretana', 5, {
+    db = await openDB<TeretanaDB>('teretana', 6, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const w = db.createObjectStore('workouts', { keyPath: 'id' })
@@ -29,6 +30,7 @@ async function getDB() {
         if (oldVersion < 3) { const c = db.createObjectStore('cardioLogs', { keyPath: 'id' }); c.createIndex('exerciseId', 'exerciseId') }
         if (oldVersion < 4) { const r = db.createObjectStore('recordings', { keyPath: 'id' }); r.createIndex('exerciseId', 'exerciseId') }
         if (oldVersion < 5) { const b = db.createObjectStore('bodyWeights', { keyPath: 'id' }); b.createIndex('date', 'date') }
+        if (oldVersion < 6) { db.createObjectStore('mealPlans', { keyPath: 'id' }) }
       },
     })
   }
@@ -309,6 +311,20 @@ export async function updateSetLogWeight(id: string, weight: number) {
 export async function updateCardioLogValues(id: string, duration: number, speed: number, incline: number) {
   const d = await getDB(); const log = await d.get('cardioLogs', id)
   if (log) await d.put('cardioLogs', { ...log, duration, speed, incline })
+}
+
+// ── Meal Plans ──
+export async function saveMealPlan(html: string, fileName: string) {
+  const d = await getDB()
+  const tx = d.transaction('mealPlans', 'readwrite')
+  await tx.objectStore('mealPlans').clear()
+  await tx.objectStore('mealPlans').add({ id: uuid(), html, fileName, uploadedAt: Date.now() })
+  await tx.done
+}
+
+export async function getMealPlan(): Promise<{ id: string; html: string; fileName: string; uploadedAt: number } | null> {
+  const all = await (await getDB()).getAll('mealPlans')
+  return all[0] ?? null
 }
 
 // ── Backup / Restore ──
