@@ -275,6 +275,42 @@ export async function getWorkoutLog(): Promise<SessionEntry[]> {
   return entries.sort((a, b) => b.date.localeCompare(a.date))
 }
 
+// ── Session manipulation ──
+export interface SessionLogData {
+  exercises: Array<{ exercise: Exercise; sets: SetLog[]; cardio: CardioLog | null }>
+}
+
+export async function getSessionData(workoutId: string, date: string): Promise<SessionLogData> {
+  const d = await getDB(); const exs = await getExercises(workoutId)
+  const result: SessionLogData['exercises'] = []
+  for (const ex of exs) {
+    const sets = (await d.getAllFromIndex('setLogs', 'exerciseId', ex.id)).filter(s => s.date === date).sort((a, b) => a.setIndex - b.setIndex)
+    const cardio = (await d.getAllFromIndex('cardioLogs', 'exerciseId', ex.id)).find(c => c.date === date) ?? null
+    if (sets.length || cardio) result.push({ exercise: ex, sets, cardio })
+  }
+  return { exercises: result }
+}
+
+export async function deleteSessionLogs(workoutId: string, date: string) {
+  const d = await getDB(); const exs = await getExercises(workoutId)
+  const tx = d.transaction(['setLogs', 'cardioLogs'], 'readwrite')
+  for (const ex of exs) {
+    for (const s of await tx.objectStore('setLogs').index('exerciseId').getAll(ex.id)) { if (s.date === date) await tx.objectStore('setLogs').delete(s.id) }
+    for (const c of await tx.objectStore('cardioLogs').index('exerciseId').getAll(ex.id)) { if (c.date === date) await tx.objectStore('cardioLogs').delete(c.id) }
+  }
+  await tx.done
+}
+
+export async function updateSetLogWeight(id: string, weight: number) {
+  const d = await getDB(); const log = await d.get('setLogs', id)
+  if (log) await d.put('setLogs', { ...log, weight })
+}
+
+export async function updateCardioLogValues(id: string, duration: number, speed: number, incline: number) {
+  const d = await getDB(); const log = await d.get('cardioLogs', id)
+  if (log) await d.put('cardioLogs', { ...log, duration, speed, incline })
+}
+
 // ── Backup / Restore ──
 export async function exportBackup(): Promise<string> {
   const d = await getDB()
