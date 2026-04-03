@@ -27,8 +27,8 @@ export default function WorkoutDetailPage() {
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">Učitavanje...</div>
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="flex items-center gap-3 px-4 pt-4 pb-4">
+    <div className="flex flex-col h-[100dvh]">
+      <div className="flex items-center gap-3 px-4 pt-4 pb-4 shrink-0">
         <button className="text-blue-400 p-1 -ml-1" onClick={() => navigate('/')}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
@@ -55,7 +55,7 @@ export default function WorkoutDetailPage() {
         )}
       </div>
       {exercises.length > 0 && (
-        <div className="sticky bottom-0 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gray-950">
+        <div className="shrink-0 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gray-950">
           {hasActiveSession ? (
             <button className="w-full py-3 rounded-2xl bg-gray-800 text-gray-300 font-semibold" onClick={() => { clearActiveSession(); setShowSummary(true) }}>Završi trening</button>
           ) : (
