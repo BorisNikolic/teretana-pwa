@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getSessionSummary } from '../db'
 import { useEscapeKey } from '../hooks/useEscapeKey'
-
-const MARKO_PHONE = '381644831056'
+import { trainerPhone } from '../lib/contact'
 
 interface Props {
   workoutId: string
@@ -19,7 +18,7 @@ export default function SessionSummary({ workoutId, onClose }: Props) {
   }, [workoutId])
 
   const sendWhatsApp = () => {
-    window.open(`https://wa.me/${MARKO_PHONE}?text=${encodeURIComponent(text)}`, '_blank')
+    window.open(`https://wa.me/${trainerPhone()}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
   const copyText = async () => {

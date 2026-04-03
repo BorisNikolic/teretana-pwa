@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { exportBackup, importBackup, saveBodyWeight, getBodyWeights, getWeeklySummary } from '../db'
 import type { BodyWeight } from '../types'
 import ConfirmModal from '../components/ConfirmModal'
-
-const MARKO_PHONE = '381644831056'
+import { trainerPhone } from '../lib/contact'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
@@ -96,7 +95,7 @@ export default function SettingsPage() {
             <div className="mt-3 space-y-3">
               <pre className="bg-gray-900 rounded-2xl p-4 text-sm whitespace-pre-wrap font-sans leading-relaxed">{weeklySummary}</pre>
               <div className="flex gap-3">
-                <button className="flex-1 py-3 rounded-xl bg-green-700 font-semibold" onClick={() => window.open(`https://wa.me/${MARKO_PHONE}?text=${encodeURIComponent(weeklySummary)}`, '_blank')}>
+                <button className="flex-1 py-3 rounded-xl bg-green-700 font-semibold" onClick={() => window.open(`https://wa.me/${trainerPhone()}?text=${encodeURIComponent(weeklySummary)}`, '_blank')}>
                   Pošalji Marku
                 </button>
                 <button className={`flex-1 py-3 rounded-xl font-semibold ${copied ? 'bg-green-800 text-green-200' : 'bg-gray-800 text-gray-300'}`} onClick={async () => { await navigator.clipboard.writeText(weeklySummary); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
