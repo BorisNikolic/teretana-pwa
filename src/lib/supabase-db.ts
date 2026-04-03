@@ -1,6 +1,7 @@
 import supabase from './supabase'
-import type { Exercise, Workout } from '../types'
+import type { Exercise, Workout, SetLog, CardioLog, BodyWeight } from '../types'
 import type { Profile } from '../contexts/AuthContext'
+import { formatWorkoutLog, formatWeeklySummary, formatMonthlyReport, type SessionEntry } from './reports'
 
 // ── Client queries ──
 
@@ -87,10 +88,99 @@ export async function getClientMealPlanAdmin(clientId: string): Promise<{ html: 
 }
 
 export async function uploadMealPlan(clientId: string, html: string, fileName: string) {
-  // Delete old plans for this client, then insert new
   await supabase.from('meal_plans').delete().eq('client_id', clientId)
   const { error } = await supabase.from('meal_plans').insert({ client_id: clientId, html, file_name: fileName })
   if (error) throw error
+}
+
+// ── Sync functions (client → Supabase, fire-and-forget) ──
+
+export async function syncSetLog(exerciseId: string, setIndex: number, weight: number, date: string, timestamp: number) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  // Upsert: delete existing then insert (no unique constraint to use upsert)
+  await supabase.from('set_logs').delete().match({ user_id: user.id, exercise_id: exerciseId, date, set_index: setIndex })
+  await supabase.from('set_logs').insert({ user_id: user.id, exercise_id: exerciseId, set_index: setIndex, weight, date, timestamp })
+}
+
+export async function syncCardioLog(exerciseId: string, duration: number, incline: number, speed: number, date: string, timestamp: number) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.from('cardio_logs').delete().match({ user_id: user.id, exercise_id: exerciseId, date })
+  await supabase.from('cardio_logs').insert({ user_id: user.id, exercise_id: exerciseId, duration, incline, speed, date, timestamp })
+}
+
+export async function syncBodyWeight(weight: number, date: string, timestamp: number) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.from('body_weights').delete().match({ user_id: user.id, date })
+  await supabase.from('body_weights').insert({ user_id: user.id, weight, date, timestamp })
+}
+
+export async function syncDeleteSessionLogs(exerciseIds: string[], date: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  for (const eid of exerciseIds) {
+    await supabase.from('set_logs').delete().match({ user_id: user.id, exercise_id: eid, date })
+    await supabase.from('cardio_logs').delete().match({ user_id: user.id, exercise_id: eid, date })
+  }
+}
+
+export async function syncUpdateSetLog(exerciseId: string, setIndex: number, weight: number, date: string, timestamp: number) {
+  return syncSetLog(exerciseId, setIndex, weight, date, timestamp)
+}
+
+export async function syncUpdateCardioLog(exerciseId: string, duration: number, incline: number, speed: number, date: string, timestamp: number) {
+  return syncCardioLog(exerciseId, duration, incline, speed, date, timestamp)
+}
+
+// ── Admin: read client logs ──
+
+export async function getClientSetLogs(clientId: string): Promise<SetLog[]> {
+  const { data } = await supabase.from('set_logs').select('*').eq('user_id', clientId).order('timestamp', { ascending: false })
+  return (data ?? []).map(r => ({ id: r.id, exerciseId: r.exercise_id, setIndex: r.set_index, weight: Number(r.weight), date: r.date, timestamp: r.timestamp }))
+}
+
+export async function getClientCardioLogs(clientId: string): Promise<CardioLog[]> {
+  const { data } = await supabase.from('cardio_logs').select('*').eq('user_id', clientId).order('timestamp', { ascending: false })
+  return (data ?? []).map(r => ({ id: r.id, exerciseId: r.exercise_id, duration: r.duration, incline: Number(r.incline), speed: Number(r.speed), date: r.date, timestamp: r.timestamp }))
+}
+
+export async function getClientBodyWeights(clientId: string): Promise<BodyWeight[]> {
+  const { data } = await supabase.from('body_weights').select('*').eq('user_id', clientId).order('date', { ascending: false })
+  return (data ?? []).map(r => ({ id: r.id, weight: Number(r.weight), date: r.date, timestamp: r.timestamp }))
+}
+
+export async function getClientWorkoutLog(clientId: string): Promise<SessionEntry[]> {
+  const workoutIds = await getClientAssignedWorkoutIds(clientId)
+  const workouts: Workout[] = []; const allExercises: Exercise[] = []
+  for (const wid of workoutIds) {
+    const ws = await getAllWorkouts(); const w = ws.find(x => x.id === wid)
+    if (w && !workouts.find(x => x.id === w.id)) { workouts.push(w); allExercises.push(...(await getExercises(wid))) }
+  }
+  const setLogs = await getClientSetLogs(clientId)
+  const cardioLogs = await getClientCardioLogs(clientId)
+  return formatWorkoutLog(workouts, allExercises, setLogs, cardioLogs)
+}
+
+export async function getClientWeeklySummary(clientId: string): Promise<string> {
+  const workoutIds = await getClientAssignedWorkoutIds(clientId)
+  const workouts: Workout[] = []; const allExercises: Exercise[] = []
+  for (const wid of workoutIds) {
+    const ws = await getAllWorkouts(); const w = ws.find(x => x.id === wid)
+    if (w && !workouts.find(x => x.id === w.id)) { workouts.push(w); allExercises.push(...(await getExercises(wid))) }
+  }
+  return formatWeeklySummary(workouts, allExercises, await getClientSetLogs(clientId), await getClientCardioLogs(clientId), await getClientBodyWeights(clientId))
+}
+
+export async function getClientMonthlyReport(clientId: string, yearMonth: string): Promise<string> {
+  const workoutIds = await getClientAssignedWorkoutIds(clientId)
+  const workouts: Workout[] = []; const allExercises: Exercise[] = []
+  for (const wid of workoutIds) {
+    const ws = await getAllWorkouts(); const w = ws.find(x => x.id === wid)
+    if (w && !workouts.find(x => x.id === w.id)) { workouts.push(w); allExercises.push(...(await getExercises(wid))) }
+  }
+  return formatMonthlyReport(yearMonth, workouts, allExercises, await getClientSetLogs(clientId), await getClientCardioLogs(clientId), await getClientBodyWeights(clientId))
 }
 
 // ── Mappers (snake_case → camelCase) ──

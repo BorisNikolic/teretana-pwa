@@ -1,5 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Workout, Exercise, SetLog, CardioLog, Recording, BodyWeight } from './types'
+import { syncSetLog, syncCardioLog, syncBodyWeight, syncDeleteSessionLogs, syncUpdateSetLog, syncUpdateCardioLog } from './lib/supabase-db'
+import { formatSessionSummary, formatWeeklySummary, formatMonthlyReport, formatWorkoutLog, type SessionEntry } from './lib/reports'
 
 interface TeretanaDB extends DBSchema {
   workouts: { key: string; value: Workout; indexes: { order: number } }
@@ -42,10 +44,11 @@ function today() { return new Date().toISOString().slice(0, 10) }
 
 // ── SetLogs ──
 export async function saveSetLog(exerciseId: string, setIndex: number, weight: number) {
-  const d = await getDB(); const date = today()
+  const d = await getDB(); const date = today(); const timestamp = Date.now()
   const all = await d.getAllFromIndex('setLogs', 'exerciseId', exerciseId)
   const existing = all.find(l => l.date === date && l.setIndex === setIndex)
-  await d.put('setLogs', { id: existing?.id ?? uuid(), exerciseId, setIndex, weight, date, timestamp: Date.now() })
+  await d.put('setLogs', { id: existing?.id ?? uuid(), exerciseId, setIndex, weight, date, timestamp })
+  syncSetLog(exerciseId, setIndex, weight, date, timestamp).catch(() => {})
 }
 export async function getSetLogs(exerciseId: string): Promise<SetLog[]> {
   return (await (await getDB()).getAllFromIndex('setLogs', 'exerciseId', exerciseId)).sort((a, b) => b.timestamp - a.timestamp)
@@ -63,10 +66,11 @@ export async function getPersonalRecord(exerciseId: string): Promise<number> {
 
 // ── CardioLogs ──
 export async function saveCardioLog(exerciseId: string, duration: number, incline: number, speed: number) {
-  const d = await getDB(); const date = today()
+  const d = await getDB(); const date = today(); const timestamp = Date.now()
   const all = await d.getAllFromIndex('cardioLogs', 'exerciseId', exerciseId)
   const existing = all.find(l => l.date === date)
-  await d.put('cardioLogs', { id: existing?.id ?? uuid(), exerciseId, duration, incline, speed, date, timestamp: Date.now() })
+  await d.put('cardioLogs', { id: existing?.id ?? uuid(), exerciseId, duration, incline, speed, date, timestamp })
+  syncCardioLog(exerciseId, duration, incline, speed, date, timestamp).catch(() => {})
 }
 export async function getCardioLogs(exerciseId: string): Promise<CardioLog[]> {
   return (await (await getDB()).getAllFromIndex('cardioLogs', 'exerciseId', exerciseId)).sort((a, b) => b.timestamp - a.timestamp)
@@ -89,10 +93,11 @@ export async function getTodayRecording(exerciseId: string): Promise<Recording |
 
 // ── Body Weight ──
 export async function saveBodyWeight(weight: number) {
-  const d = await getDB(); const date = today()
+  const d = await getDB(); const date = today(); const timestamp = Date.now()
   const all = await d.getAll('bodyWeights')
   const existing = all.find(b => b.date === date)
-  await d.put('bodyWeights', { id: existing?.id ?? uuid(), weight, date, timestamp: Date.now() })
+  await d.put('bodyWeights', { id: existing?.id ?? uuid(), weight, date, timestamp })
+  syncBodyWeight(weight, date, timestamp).catch(() => {})
 }
 export async function getBodyWeights(): Promise<BodyWeight[]> {
   return (await (await getDB()).getAll('bodyWeights')).sort((a, b) => b.date.localeCompare(a.date))
@@ -104,17 +109,10 @@ export async function getVideo(exerciseId: string): Promise<Blob | null> {
   return (await (await getDB()).get('videos', exerciseId))?.blob ?? null
 }
 
-// ── Last workout dates (accepts workouts + exercises from Supabase) ──
+// ── Last workout dates ──
 export async function getAllLastWorkoutDates(workouts: Workout[], allExercises?: Exercise[]): Promise<Record<string, string | null>> {
   const d = await getDB()
-  // If exercises not passed, try to build exercise-to-workout map from local setLogs/cardioLogs
-  let exToWorkout: Map<string, string>
-  if (allExercises) {
-    exToWorkout = new Map(allExercises.map(e => [e.id, e.workoutId]))
-  } else {
-    // Fallback: we just know workout IDs, collect all exerciseIds from logs
-    exToWorkout = new Map()
-  }
+  const exToWorkout = allExercises ? new Map(allExercises.map(e => [e.id, e.workoutId])) : new Map<string, string>()
   const allSets = await d.getAll('setLogs')
   const allCardio = await d.getAll('cardioLogs')
   const dates: Record<string, string[]> = {}
@@ -126,117 +124,35 @@ export async function getAllLastWorkoutDates(workouts: Workout[], allExercises?:
   return result
 }
 
-// ── Session summary (exercises passed from Supabase) ──
-function fmtDate(s: string) { const [y, m, d] = s.split('-'); return `${+d}. ${+m}. ${y}.` }
-function fmtDur(sec: number) { const m = Math.floor(sec / 60), s = sec % 60; return s > 0 ? `${m}min ${s}s` : `${m}min` }
+// ── Reports (delegate to pure formatters, read from IDB) ──
+export { type SessionEntry } from './lib/reports'
 
 export async function getSessionSummary(workoutName: string, exercises: Exercise[], date?: string): Promise<string> {
   const d = date ?? today()
-  const lines: string[] = [`Trening: ${workoutName}`, fmtDate(d), '']
+  const setLogs: SetLog[] = []; const cardioLogs: CardioLog[] = []
   for (const ex of exercises) {
-    if ((ex.type ?? 'strength') === 'cardio') {
-      const log = (await getCardioLogs(ex.id)).find(l => l.date === d)
-      lines.push(log ? `${ex.name}: ${fmtDur(log.duration)}, ${log.speed} km/h, nagib ${log.incline}%` : `${ex.name}: —`)
-    } else {
-      const logs = (await getSetLogs(ex.id)).filter(l => l.date === d).sort((a, b) => a.setIndex - b.setIndex)
-      lines.push(logs.length ? `${ex.name}: ${ex.setsCount}×${ex.reps} — ${logs.map(l => `${l.weight}`).join('/')} kg` : `${ex.name}: —`)
-    }
+    setLogs.push(...(await getSetLogs(ex.id)).filter(l => l.date === d))
+    const cl = (await getCardioLogs(ex.id)).find(l => l.date === d)
+    if (cl) cardioLogs.push(cl)
   }
-  return lines.join('\n')
+  return formatSessionSummary(workoutName, exercises, setLogs, cardioLogs, d)
 }
-
-// ── Weekly summary ──
-const DAYS_SR = ['ned', 'pon', 'uto', 'sre', 'čet', 'pet', 'sub']
 
 export async function getWeeklySummary(workouts: Workout[], allExercises: Exercise[]): Promise<string> {
-  const now = new Date(); const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7)
-  const startDate = weekAgo.toISOString().slice(0, 10); const endDate = today()
-  const lines: string[] = [`Nedeljni pregled (${fmtDate(startDate)} — ${fmtDate(endDate)})`, '']
-  const bw = await getBodyWeights(); const latestBw = bw[0]
-  if (latestBw) lines.push(`Telesna težina: ${latestBw.weight} kg`, '')
-  for (const w of workouts) {
-    const exs = allExercises.filter(e => e.workoutId === w.id).sort((a, b) => a.order - b.order)
-    let hasData = false
-    for (const ex of exs) {
-      if ((ex.type ?? 'strength') === 'cardio') {
-        const logs = (await getCardioLogs(ex.id)).filter(l => l.date >= startDate && l.date <= endDate)
-        if (logs.length) {
-          if (!hasData) { lines.push(`${w.name}:`); hasData = true }
-          for (const log of logs) { const day = DAYS_SR[new Date(log.date).getDay()]; lines.push(`  ${day} ${fmtDate(log.date)}: ${ex.name} — ${fmtDur(log.duration)}, ${log.speed} km/h, nagib ${log.incline}%`) }
-        }
-      } else {
-        const logs = (await getSetLogs(ex.id)).filter(l => l.date >= startDate && l.date <= endDate)
-        const dates = [...new Set(logs.map(l => l.date))].sort()
-        if (dates.length) {
-          if (!hasData) { lines.push(`${w.name}:`); hasData = true }
-          for (const date of dates) {
-            const day = DAYS_SR[new Date(date).getDay()]
-            const dLogs = logs.filter(l => l.date === date).sort((a, b) => a.setIndex - b.setIndex)
-            lines.push(`  ${day} ${fmtDate(date)}: ${ex.name} — ${dLogs.map(l => `${l.weight}`).join('/')} kg`)
-          }
-        }
-      }
-    }
-    if (hasData) lines.push('')
-  }
-  return lines.join('\n').trim()
+  const setLogs: SetLog[] = []; const cardioLogs: CardioLog[] = []
+  for (const ex of allExercises) { setLogs.push(...await getSetLogs(ex.id)); cardioLogs.push(...await getCardioLogs(ex.id)) }
+  return formatWeeklySummary(workouts, allExercises, setLogs, cardioLogs, await getBodyWeights())
 }
-
-// ── Monthly report ──
-const MONTHS_SR = ['', 'januar', 'februar', 'mart', 'april', 'maj', 'jun', 'jul', 'avgust', 'septembar', 'oktobar', 'novembar', 'decembar']
 
 export async function getMonthlyReport(yearMonth: string, workouts: Workout[], allExercises: Exercise[]): Promise<string> {
-  const [y, m] = yearMonth.split('-')
-  const lines: string[] = [`Mesečni izveštaj — ${MONTHS_SR[+m]} ${y}`, '']
-  const bw = (await getBodyWeights()).filter(b => b.date.startsWith(yearMonth))
-  if (bw.length) { const first = bw[bw.length - 1], last = bw[0]; lines.push(`Telesna težina: ${first.weight} → ${last.weight} kg`, '') }
-  for (const w of workouts) {
-    const exs = allExercises.filter(e => e.workoutId === w.id).sort((a, b) => a.order - b.order)
-    let hasData = false
-    for (const ex of exs) {
-      if ((ex.type ?? 'strength') === 'cardio') {
-        const logs = (await getCardioLogs(ex.id)).filter(l => l.date.startsWith(yearMonth))
-        if (logs.length) {
-          const first = logs[logs.length - 1], last = logs[0]
-          if (!hasData) { lines.push(`${w.name}:`); hasData = true }
-          lines.push(`  ${ex.name}: ${fmtDur(first.duration)}/${first.speed}km/h → ${fmtDur(last.duration)}/${last.speed}km/h`)
-        }
-      } else {
-        const logs = (await getSetLogs(ex.id)).filter(l => l.date.startsWith(yearMonth))
-        if (logs.length) {
-          const dates = [...new Set(logs.map(l => l.date))].sort()
-          const firstMax = Math.max(...logs.filter(l => l.date === dates[0]).map(l => l.weight))
-          const lastMax = Math.max(...logs.filter(l => l.date === dates[dates.length - 1]).map(l => l.weight))
-          if (!hasData) { lines.push(`${w.name}:`); hasData = true }
-          lines.push(`  ${ex.name}: ${firstMax} → ${lastMax} kg`)
-        }
-      }
-    }
-    if (hasData) lines.push('')
-  }
-  return lines.join('\n').trim()
+  const setLogs: SetLog[] = []; const cardioLogs: CardioLog[] = []
+  for (const ex of allExercises) { setLogs.push(...await getSetLogs(ex.id)); cardioLogs.push(...await getCardioLogs(ex.id)) }
+  return formatMonthlyReport(yearMonth, workouts, allExercises, setLogs, cardioLogs, await getBodyWeights())
 }
-
-// ── Workout log ──
-export interface SessionEntry { date: string; workoutId: string; workoutName: string; lines: string[] }
 
 export async function getWorkoutLog(workouts: Workout[], allExercises: Exercise[]): Promise<SessionEntry[]> {
   const d = await getDB()
-  const allSets = await d.getAll('setLogs'), allCardio = await d.getAll('cardioLogs')
-  const exMap = new Map(allExercises.map(e => [e.id, e])), wMap = new Map(workouts.map(w => [w.id, w]))
-  const sessions = new Map<string, { date: string; workoutId: string; sets: SetLog[]; cardio: CardioLog[] }>()
-  for (const log of allSets) { const ex = exMap.get(log.exerciseId); if (!ex) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.sets.push(log) }
-  for (const log of allCardio) { const ex = exMap.get(log.exerciseId); if (!ex) continue; const k = `${log.date}::${ex.workoutId}`; if (!sessions.has(k)) sessions.set(k, { date: log.date, workoutId: ex.workoutId, sets: [], cardio: [] }); sessions.get(k)!.cardio.push(log) }
-  const entries: SessionEntry[] = []
-  for (const s of sessions.values()) {
-    const exs = allExercises.filter(e => e.workoutId === s.workoutId).sort((a, b) => a.order - b.order); const lines: string[] = []
-    for (const ex of exs) {
-      if ((ex.type ?? 'strength') === 'cardio') { const l = s.cardio.find(c => c.exerciseId === ex.id); if (l) lines.push(`${ex.name}: ${fmtDur(l.duration)}, ${l.speed} km/h, nagib ${l.incline}%`) }
-      else { const ls = s.sets.filter(l => l.exerciseId === ex.id).sort((a, b) => a.setIndex - b.setIndex); if (ls.length) lines.push(`${ex.name}: ${ls.map(l => `${l.weight}`).join('/')} kg`) }
-    }
-    if (lines.length) entries.push({ date: s.date, workoutId: s.workoutId, workoutName: wMap.get(s.workoutId)?.name ?? '', lines })
-  }
-  return entries.sort((a, b) => b.date.localeCompare(a.date))
+  return formatWorkoutLog(workouts, allExercises, await d.getAll('setLogs'), await d.getAll('cardioLogs'))
 }
 
 // ── Session manipulation ──
@@ -263,15 +179,21 @@ export async function deleteSessionLogs(exercises: Exercise[], date: string) {
     for (const c of await tx.objectStore('cardioLogs').index('exerciseId').getAll(ex.id)) { if (c.date === date) await tx.objectStore('cardioLogs').delete(c.id) }
   }
   await tx.done
+  syncDeleteSessionLogs(exercises.map(e => e.id), date).catch(() => {})
 }
 
 export async function updateSetLogWeight(id: string, weight: number) {
   const d = await getDB(); const log = await d.get('setLogs', id)
-  if (log) await d.put('setLogs', { ...log, weight })
+  if (log) {
+    await d.put('setLogs', { ...log, weight })
+    syncUpdateSetLog(log.exerciseId, log.setIndex, weight, log.date, log.timestamp).catch(() => {})
+  }
 }
 
 export async function updateCardioLogValues(id: string, duration: number, speed: number, incline: number) {
   const d = await getDB(); const log = await d.get('cardioLogs', id)
-  if (log) await d.put('cardioLogs', { ...log, duration, speed, incline })
+  if (log) {
+    await d.put('cardioLogs', { ...log, duration, speed, incline })
+    syncUpdateCardioLog(log.exerciseId, duration, incline, speed, log.date, log.timestamp).catch(() => {})
+  }
 }
-
