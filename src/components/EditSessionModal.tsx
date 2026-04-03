@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
+import type { Exercise } from '../types'
 import { getSessionData, updateSetLogWeight, updateCardioLogValues, type SessionLogData } from '../db'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface Props {
   workoutId: string
   date: string
+  allExercises: Exercise[]
   onClose: () => void
   onSaved: () => void
 }
 
-export default function EditSessionModal({ workoutId, date, onClose, onSaved }: Props) {
+export default function EditSessionModal({ workoutId, date, allExercises, onClose, onSaved }: Props) {
   const [data, setData] = useState<SessionLogData | null>(null)
   const [weights, setWeights] = useState<Record<string, string>>({})
   const [cardioInputs, setCardioInputs] = useState<Record<string, { duration: string; speed: string; incline: string }>>({})
@@ -17,7 +19,8 @@ export default function EditSessionModal({ workoutId, date, onClose, onSaved }: 
   useEscapeKey(onClose)
 
   useEffect(() => {
-    getSessionData(workoutId, date).then(d => {
+    const exs = allExercises.filter(e => e.workoutId === workoutId)
+    getSessionData(exs, date).then(d => {
       setData(d)
       const w: Record<string, string> = {}
       const c: typeof cardioInputs = {}
@@ -28,7 +31,7 @@ export default function EditSessionModal({ workoutId, date, onClose, onSaved }: 
       setWeights(w)
       setCardioInputs(c)
     })
-  }, [workoutId, date])
+  }, [workoutId, date, allExercises])
 
   const handleSave = async () => {
     if (!data) return
@@ -50,7 +53,6 @@ export default function EditSessionModal({ workoutId, date, onClose, onSaved }: 
       <div className="bg-gray-900 w-full rounded-t-2xl p-6 pb-10 max-h-[90vh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-semibold mb-1">Izmeni trening</h2>
         <p className="text-sm text-gray-500 mb-4">{fmtDate(date)}</p>
-
         {!data ? <p className="text-gray-500 text-center py-8">Učitavanje...</p> : (
           <div className="space-y-4">
             {data.exercises.map(({ exercise, sets, cardio }) => (
@@ -87,7 +89,6 @@ export default function EditSessionModal({ workoutId, date, onClose, onSaved }: 
             ))}
           </div>
         )}
-
         <div className="flex gap-3 mt-4">
           <button className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300" onClick={onClose}>Otkaži</button>
           <button className="flex-1 py-3 rounded-xl bg-blue-600 font-semibold disabled:opacity-40" disabled={saving || !data} onClick={handleSave}>

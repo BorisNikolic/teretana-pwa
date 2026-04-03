@@ -1,22 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { exportBackup, importBackup, saveBodyWeight, getBodyWeights, getWeeklySummary } from '../db'
-import type { BodyWeight } from '../types'
-import ConfirmModal from '../components/ConfirmModal'
+import { saveBodyWeight, getBodyWeights, getWeeklySummary } from '../db'
+import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
+import type { BodyWeight, Workout, Exercise } from '../types'
+import { useAuth } from '../contexts/AuthContext'
 import { tid } from '../lib/contact'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
+  const { profile, signOut } = useAuth()
   const [bw, setBw] = useState('')
   const [bodyWeights, setBodyWeights] = useState<BodyWeight[]>([])
   const [bwSaved, setBwSaved] = useState(false)
-  const [backupStatus, setBackupStatus] = useState('')
-  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [workouts, setWorkouts] = useState<Workout[]>([])
+  const [allExercises, setAllExercises] = useState<Exercise[]>([])
 
   useEffect(() => { getBodyWeights().then(setBodyWeights) }, [bwSaved])
+  useEffect(() => {
+    getAssignedWorkouts().then(async ws => {
+      const exs: Exercise[] = []
+      for (const w of ws) exs.push(...(await getExercises(w.id)))
+      setWorkouts(ws); setAllExercises(exs)
+    })
+  }, [])
 
   const handleSaveBw = async () => {
     const w = parseFloat(bw); if (!w) return
@@ -24,34 +32,9 @@ export default function SettingsPage() {
     setTimeout(() => setBwSaved(false), 2000)
   }
 
-  const handleExport = async () => {
-    const json = await exportBackup()
-    const blob = new Blob([json], { type: 'application/json' })
-    const file = new File([blob], `teretana-backup-${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' })
-    try {
-      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Teretana Backup' }); return }
-    } catch (e: any) { if (e?.name === 'AbortError' || e?.name === 'NotAllowedError') return }
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url)
-    setBackupStatus('Izvezeno!'); setTimeout(() => setBackupStatus(''), 2000)
-  }
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return
-    setPendingImportFile(file)
-    e.target.value = ''
-  }
-
-  const confirmImport = async () => {
-    if (!pendingImportFile) return
-    const json = await pendingImportFile.text()
-    setPendingImportFile(null)
-    try { await importBackup(json); setBackupStatus('Uvezeno! Osveži stranicu.'); setTimeout(() => window.location.reload(), 1500) }
-    catch { setBackupStatus('Greška pri uvozu.') }
-  }
-
   const handleWeekly = async () => {
     if (weeklySummary) { setWeeklySummary(null); return }
-    setWeeklySummary(await getWeeklySummary())
+    setWeeklySummary(await getWeeklySummary(workouts, allExercises))
   }
 
   return (
@@ -64,6 +47,15 @@ export default function SettingsPage() {
       </div>
 
       <div className="px-4 space-y-6 pb-10">
+        {/* User info */}
+        <section className="bg-gray-900 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">{profile?.full_name || 'Korisnik'}</p>
+            <p className="text-sm text-gray-500">{profile?.email}</p>
+          </div>
+          <button className="text-sm text-red-400 px-3 py-1.5 rounded-lg bg-gray-800" onClick={signOut}>Odjavi se</button>
+        </section>
+
         {/* Body weight */}
         <section>
           <h2 className="text-base font-semibold mb-3">Telesna težina</h2>
@@ -106,19 +98,7 @@ export default function SettingsPage() {
           )}
         </section>
 
-        {/* Backup / Restore */}
-        <section>
-          <h2 className="text-base font-semibold mb-3">Backup podataka</h2>
-          <div className="flex flex-col gap-3">
-            <button className="w-full py-3 rounded-xl bg-blue-600 font-semibold" onClick={handleExport}>Izvezi backup</button>
-            <button className="w-full py-3 rounded-xl bg-gray-800 text-gray-300 font-semibold" onClick={() => fileRef.current?.click()}>Uvezi backup</button>
-            <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-            {backupStatus && <p className="text-sm text-center text-green-400">{backupStatus}</p>}
-            <p className="text-xs text-gray-600 text-center">Backup čuva treninge, vežbe, kilaže i telesnu težinu. Videji se ne uvoze/izvoze.</p>
-          </div>
-        </section>
       </div>
-      {pendingImportFile && <ConfirmModal message="Uvoz će prebrisati sve postojeće podatke. Nastavi?" confirmLabel="Uvezi" onConfirm={confirmImport} onCancel={() => setPendingImportFile(null)} />}
     </div>
   )
 }

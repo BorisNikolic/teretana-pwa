@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getWorkoutLog, deleteSessionLogs, type SessionEntry } from '../db'
+import { getAssignedWorkouts, getExercises } from '../lib/supabase-db'
+import type { Exercise } from '../types'
 import ConfirmModal from '../components/ConfirmModal'
 import EditSessionModal from '../components/EditSessionModal'
 
@@ -14,28 +16,36 @@ function formatDate(dateStr: string) {
 export default function WorkoutLogPage() {
   const navigate = useNavigate()
   const [entries, setEntries] = useState<SessionEntry[]>([])
+  const [allExercises, setAllExercises] = useState<Exercise[]>([])
   const [deleting, setDeleting] = useState<SessionEntry | null>(null)
   const [editing, setEditing] = useState<SessionEntry | null>(null)
 
-  const load = () => { getWorkoutLog().then(setEntries) }
-  useEffect(load, [])
+  const load = async () => {
+    const ws = await getAssignedWorkouts()
+    const exs: Exercise[] = []
+    for (const w of ws) exs.push(...(await getExercises(w.id)))
+    setAllExercises(exs)
+    setEntries(await getWorkoutLog(ws, exs))
+  }
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async (entry: SessionEntry) => {
+    const exs = allExercises.filter(e => e.workoutId === entry.workoutId)
+    await deleteSessionLogs(exs, entry.date)
+    setDeleting(null); load()
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex items-center gap-3 px-4 pt-4 pb-4">
         <button className="text-blue-400 p-1 -ml-1" onClick={() => navigate('/')}>
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <h1 className="text-2xl font-bold flex-1">Dnevnik</h1>
       </div>
-
       <div className="flex-1 px-4 pb-8">
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500">
-            <p>Još nema zabeleženih treninga</p>
-          </div>
+          <div className="flex flex-col items-center justify-center h-64 gap-2 text-gray-500"><p>Još nema zabeleženih treninga</p></div>
         ) : (
           <div className="flex flex-col gap-3">
             {entries.map(entry => (
@@ -52,19 +62,14 @@ export default function WorkoutLogPage() {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  {entry.lines.map((line, i) => (
-                    <p key={i} className="text-sm text-gray-400">{line}</p>
-                  ))}
-                </div>
+                <div className="space-y-1">{entry.lines.map((line, i) => <p key={i} className="text-sm text-gray-400">{line}</p>)}</div>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {deleting && <ConfirmModal message={`Obrisati trening od ${formatDate(deleting.date)}?`} onConfirm={async () => { await deleteSessionLogs(deleting.workoutId, deleting.date); setDeleting(null); load() }} onCancel={() => setDeleting(null)} />}
-      {editing && <EditSessionModal workoutId={editing.workoutId} date={editing.date} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
+      {deleting && <ConfirmModal message={`Obrisati trening od ${formatDate(deleting.date)}?`} onConfirm={() => handleDelete(deleting)} onCancel={() => setDeleting(null)} />}
+      {editing && <EditSessionModal workoutId={editing.workoutId} date={editing.date} allExercises={allExercises} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
     </div>
   )
 }
