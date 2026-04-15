@@ -4,6 +4,7 @@ import type { Exercise, CardioLog } from '../types'
 import { getExercises } from '../lib/supabase-db'
 import { saveSetLog, getLastSessionWeights, saveCardioLog, getLastCardioLog, saveRecording, getTodayRecording, getPersonalRecord, getTodaySetLogs } from '../db'
 import { useRestTimer } from '../hooks/useRestTimer'
+import { useWakeLock } from '../hooks/useWakeLock'
 import InfoCard from '../components/InfoCard'
 import ExerciseHistory from '../components/ExerciseHistory'
 
@@ -21,6 +22,7 @@ export default function ExerciseDetailPage() {
   const [weights, setWeights] = useState<Record<number, string>>({})
   const [lastWeights, setLastWeights] = useState<Record<number, number>>({})
   const timer = useRestTimer()
+  useWakeLock()
 
   const [cardioDuration, setCardioDuration] = useState('')
   const [cardioIncline, setCardioIncline] = useState('')
