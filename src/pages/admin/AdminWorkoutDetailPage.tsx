@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { DndContext, closestCenter, type DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -80,6 +80,9 @@ function ExercisePickerModal({ workoutExerciseIds, onPick, onClose }: { workoutE
 export default function AdminWorkoutDetailPage() {
   const { workoutId } = useParams<{ workoutId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const clientId = searchParams.get('client')
+  const backTo = clientId ? `/admin/clients/${clientId}` : '/admin/workouts'
   const [workout, setWorkout] = useState<Workout | null>(null)
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showPicker, setShowPicker] = useState(false)
@@ -117,7 +120,7 @@ export default function AdminWorkoutDetailPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex items-center gap-3 px-4 pt-4 pb-4">
-        <button className="text-blue-400 p-1 -ml-1" onClick={() => navigate('/admin/workouts')}>
+        <button className="text-blue-400 p-1 -ml-1" onClick={() => navigate(backTo)}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <h1 className="text-2xl font-bold flex-1">{workout?.name}</h1>
